@@ -421,20 +421,35 @@ function registroDentroDaDataCorrente(item) {
     return dataRegistro <= fimHoje;
 }
 
-function diasDisponiveisNoMes(ano, mes) {
-    const diasNoMes = new Date(ano, mes, 0).getDate();
-    const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const mesReferencia = new Date(ano, mes - 1, 1);
+function isDiaUtil(dataReferencia) {
+    const diaSemana = dataReferencia.getDay();
+    return diaSemana >= 1 && diaSemana <= 5;
+}
 
-    if (mesReferencia > inicioMesAtual) {
+function diasDisponiveisNoMes(ano, mes) {
+    const inicioMes = new Date(ano, mes - 1, 1);
+    const fimMes = new Date(ano, mes, 0);
+    const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    if (inicioMes > inicioMesAtual) {
         return 0;
     }
 
-    if (ano === hoje.getFullYear() && mes === hoje.getMonth() + 1) {
-        return hoje.getDate();
+    const limiteFinal = (ano === hoje.getFullYear() && mes === hoje.getMonth() + 1)
+        ? new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+        : fimMes;
+
+    let diasUteis = 0;
+    const cursor = new Date(inicioMes.getFullYear(), inicioMes.getMonth(), inicioMes.getDate());
+
+    while (cursor <= limiteFinal) {
+        if (isDiaUtil(cursor)) {
+            diasUteis += 1;
+        }
+        cursor.setDate(cursor.getDate() + 1);
     }
 
-    return diasNoMes;
+    return diasUteis;
 }
 
 function listarMesesNoPeriodo(dataInicio, dataFim) {
