@@ -1,622 +1,73 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
+    <link rel="stylesheet" href="styles.css">
     <script src="dados_historicos.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <style>
-body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #0b132b; color: #fff; }
-
-.header-container { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background: #111a3a; border-bottom: 2px solid #3a86ff; }
-
-.main-title-banner { 
-    background: linear-gradient(90deg, #111a3a 0%, #3a86ff 50%, #111a3a 100%);
-    text-align: center; padding: 15px; font-size: 28px; font-weight: 900; 
-    letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #4cc9f0;
-}
-
-.filters { padding: 15px 20px; background: #141e46; display: flex; flex-direction: column; gap: 12px; }
-.filter-row { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-
-button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 8px;
-    background: #1c2541;
-    color: #fff;
-    cursor: pointer;
-    font-weight: bold;
-    border: 1px solid #3a86ff;
-}
-
-button.active {
-    background-color: #3a86ff !important;
-    box-shadow: 0 0 10px rgba(58, 134, 255, 0.5);
-}
-
-select {
-    padding: 6px;
-    border-radius: 4px;
-    background: #1c2541;
-    color: white;
-    border: 1px solid #3a86ff;
-}
-
-.cardbar { display: flex; gap: 10px; padding: 10px; }
-
-.card {
-    flex: 1;
-    background: #1c2541;
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-    border-bottom: 3px solid #3a86ff;
-}
-
-.big { font-size: 24px; font-weight: bold; color: #4cc9f0; }
-
-.container {
-    display: flex;
-    gap: 10px;
-    padding: 10px;
-    min-height: 480px;
-}
-
-.left, .right {
-    flex: 1;
-    background: #1c2541;
-    padding: 15px;
-    border-radius: 10px;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-th { padding: 8px; background: #111a3a; color: #3a86ff; }
-td, th { border: 1px solid #2a3b6b; text-align: center; }
-
-#calendar td {
-    height: 85px;
-    vertical-align: middle;
-    position: relative;
-    width: 14.2%;
-}
-
-.day { position: absolute; top: 4px; left: 6px; font-weight: bold; }
-
-.cell-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-}
-
-canvas {
-    flex-grow: 1;
-    width: 100% !important;
-}
-
-/* ===== MOBILE ===== */
-@media (max-width: 768px) {
-
-    .main-title-banner {
-        font-size: 18px;
-        padding: 10px;
-    }
-
-    .cardbar {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-    }
-
-    .container {
-        flex-direction: column;
-    }
-
-    /* ===== CALENDÁRIO ===== */
-    .left {
-        flex: none;
-        height: auto;
-        min-height: unset;
-    }
-
-    #calendar {
-        height: auto;
-    }
-
-    #calendar td {
-        height: 95px;
-        padding: 6px;
-    }
-
-    /* ===== HISTÓRICO ===== */
-    .right {
-        flex: none;
-        height: 260px;
-    }
-
-    /* ===== VISÃO GERAL ===== */
-    .container.modo-geral .left,
-    .container.modo-geral .right {
-        height: 360px;
-    }
-
-    canvas {
-        height: 100% !important;
-    }
-}
-</style>
+    <script defer src="app.js"></script>
 </head>
 <body>
-
-<div class="header-container">
-    <div style="font-weight: bold; color: #3a86ff; font-size: 20px;">Clinica Cavallieri</div>
-</div>
-
-<div class="main-title-banner" id="tituloPrincipal">DASHBOARD DE PERFORMANCE</div>
-
-<div class="filters">
-    <div class="filter-row">
-        <span>Período:</span>
-        <select id="anoFiltro"></select>
-        <select id="mesFiltro">
-            <option value="1">Janeiro</option><option value="2" selected>Fevereiro</option><option value="3">Março</option>
-            <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
-            <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
-            <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
-        </select>
+    <div class="header-container">
+        <div class="brand">Clinica Cavallieri</div>
     </div>
-    <div class="filter-row" id="grupoBotoes">
-        <span>Salas:</span>
-        <button class="active" onclick="setSala('ALL', this)">VISÃO GERAL</button>
-        <button onclick="setSala('306', this)">306</button>
-        <button onclick="setSala('307', this)">307</button>
-        <button onclick="setSala('313', this)">313</button>
-        <button onclick="setSala('602', this)">602</button>
-        <button onclick="setSala('606', this)">606</button>
-    </div>
-	<div class="filter-row">
-    <span>Visualização:</span>
-    <button class="active btn-periodo" onclick="setPeriodo(1, this)">MENSAL</button>
-	<button class="btn-periodo" onclick="setPeriodo(3, this)">3 MESES</button>
-    <button class="btn-periodo" onclick="setPeriodo(6, this)">6 MESES</button>
-    <button class="btn-periodo" onclick="setPeriodo(12, this)">12 MESES</button>
-    </div>
-</div>
 
-<div class="cardbar">
-    <div class="card"><div class="big" id="att">0</div>Atendimentos</div>
-    <div class="card"><div class="big" id="occ">0%</div>Ocupação</div>
-    <div class="card"><div class="big" id="rec">R$ 0</div>Receita</div>
-    <div class="card"><div class="big" id="ticket">R$ 0</div>Ticket médio</div>
-</div>
+    <div class="main-title-banner" id="tituloPrincipal">DASHBOARD DE PERFORMANCE</div>
+    <div class="status-banner" id="statusBanner" hidden></div>
 
-<div class="container">
-    <div class="left">
-        <b id="tituloEsquerdo">Detalhes</b>
-        <table id="calendar"></table>
-        <div style="flex-grow:1; position: relative;">
-            <canvas id="chartCapacidade" style="display:none;"></canvas>
+    <div class="filters">
+        <div class="filter-row">
+            <span>Periodo:</span>
+            <select id="anoFiltro"></select>
+            <select id="mesFiltro"></select>
+        </div>
+
+        <div class="filter-row" id="grupoBotoes">
+            <span>Salas:</span>
+            <button class="active" data-sala="ALL">VISAO GERAL</button>
+            <button data-sala="306">306</button>
+            <button data-sala="307">307</button>
+            <button data-sala="313">313</button>
+            <button data-sala="602">602</button>
+            <button data-sala="606">606</button>
+        </div>
+
+        <div class="filter-row" id="grupoPeriodo">
+            <span>Visualizacao:</span>
+            <button class="active btn-periodo" data-periodo="1">MENSAL</button>
+            <button class="btn-periodo" data-periodo="3">3 MESES</button>
+            <button class="btn-periodo" data-periodo="6">6 MESES</button>
+            <button class="btn-periodo" data-periodo="12">12 MESES</button>
         </div>
     </div>
-    <div class="right">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <b id="tituloDireito">Análise de Dados</b>
-        <div id="legendCustom" style="font-size:12px;"></div>
+
+    <div class="cardbar">
+        <div class="card"><div class="big" id="att">0</div>Atendimentos</div>
+        <div class="card"><div class="big" id="occ">0%</div>Ocupacao</div>
+        <div class="card"><div class="big" id="rec">R$ 0</div>Receita</div>
+        <div class="card"><div class="big" id="ticket">R$ 0</div>Ticket medio</div>
     </div>
-    <div style="flex-grow:1; position: relative;">
-        <canvas id="chartRight"></canvas>
+
+    <div class="container">
+        <div class="left">
+            <b id="tituloEsquerdo">Detalhes</b>
+            <table id="calendar"></table>
+            <div class="chart-wrapper">
+                <canvas id="chartCapacidade" style="display:none;"></canvas>
+            </div>
+        </div>
+        <div class="right">
+            <div class="chart-header">
+                <b id="tituloDireito">Analise de Dados</b>
+                <div id="legendCustom" class="legend-custom"></div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="chartRight"></canvas>
+            </div>
+        </div>
     </div>
-</div>
-
-<script>
-let data = [];
-let salaFiltro = "ALL";
-let periodoMeses = 1;
-let chartRight, chartCapacidade;
-const capacidade = { "306": 38, "307": 30, "313": 20, "602": 40, "606": 40 };
-const nomesMeses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-
-Chart.register(ChartDataLabels);
-
-window.onload = function() {
-    // 1. Converte a string do arquivo dados_historicos.js em objetos reais
-    let historicoFormatado = [];
-    if (typeof dadosHistoricos !== 'undefined' && dadosHistoricos.length > 0) {
-        historicoFormatado = converterStringParaObjeto(dadosHistoricos);
-    }
-
-    const URL_PUBLICA = "https://opensheet.elk.sh/1y6_yX-8aggFAmbB5tLV0ZSvyh6ffq5-jJbf5VP8DpwM/base";
-
-    fetch(URL_PUBLICA)
-        .then(res => res.json())
-        .then(json => {
-            // 2. Processa os dados de 2026 do Sheets
-            let dadosRecentes = json.map(d => ({
-                ...d,
-                ANO: Number(d.ANO),
-                MES: Number(d.MES),
-                VALOR: Number(d.VALOR)
-            }));
-
-            // 3. UNE OS DOIS
-            data = [...historicoFormatado, ...dadosRecentes];
-
-            console.log("Total unificado:", data.length);
-            carregarAnos();
-            render();
-        })
-        .catch(err => {
-            console.error("Erro no Sheets:", err);
-            data = historicoFormatado; 
-            carregarAnos();
-            render();
-        });
-};
-
-// FUNÇÃO AUXILIAR: Transforma sua string em dados que o gráfico entende
-function converterStringParaObjeto(texto) {
-    let linhas = texto.trim().split("\n");
-    let cabecalhos = linhas[0].split(";").map(h => h.trim());
-    return linhas.slice(1).map(linha => {
-        let valores = linha.split(";");
-        let obj = {};
-        cabecalhos.forEach((h, i) => {
-            let val = valores[i] ? valores[i].trim() : "";
-            // Converte colunas numéricas importantes
-            if (h === "ANO" || h === "MES") val = Number(val);
-            obj[h] = val;
-        });
-        return obj;
-    });
-}
-
-function parseCSV(text) {
-    let lines = text.split("\n");
-    let headers = lines[0].split(";").map(h => h.trim());
-    data = [];
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        let cols = lines[i].split(";");
-        let obj = {};
-        headers.forEach((h, j) => obj[h] = cols[j] ? cols[j].trim() : "");
-        data.push(obj);
-    }
-}
-
-function carregarAnos() {
- // Pega os anos únicos, transforma em número e ordena do maior para o menor
-    let anos = [...new Set(data.map(d => parseInt(d.ANO)))].sort((a, b) => b - a);
-    let sel = document.getElementById("anoFiltro");
-    sel.innerHTML = "";
-    
-    anos.forEach(a => {
-        let op = document.createElement("option");
-        op.value = a; 
-        op.text = a; 
-        // Define 2026 como selecionado por padrão
-        if(a == 2026) op.selected = true;
-        sel.appendChild(op);
-    });
-}
-
-document.getElementById("anoFiltro").onchange = render;
-document.getElementById("mesFiltro").onchange = render;
-
-function setSala(sala, btn) {
-    salaFiltro = sala;
-    document.querySelectorAll('#grupoBotoes button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    render();
-}
-
-function setPeriodo(meses, btn) {
-    periodoMeses = meses;
-    // Remove classe ativa de todos os botões de período e adiciona no clicado
-    document.querySelectorAll('.btn-periodo').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    render();
-}
-
-function num(v) {
-    if (!v) return 0;
-    return parseFloat(String(v).replace("R$", "").replace(/\./g, "").replace(",", ".").trim()) || 0;
-}
-
-function render() {
-    const container = document.querySelector('.container');
-    let anoSel = parseInt(document.getElementById("anoFiltro").value);
-    let mesSel = parseInt(document.getElementById("mesFiltro").value);
-    
-    // 1. FILTRO DO MÊS ATUAL (Sempre para o Calendário)
-    let filteredMes = data.filter(d => 
-        d.ANO == anoSel && d.MES == mesSel && (salaFiltro == "ALL" || d.SALA_FINAL == salaFiltro)
-    );
-
-    // 2. FILTRO DO PERÍODO ACUMULADO (Cartões e Gráfico Regressivo)
-    let dataFim = new Date(anoSel, mesSel, 0);
-    let dataInicio = new Date(anoSel, mesSel - 1, 1);
-    dataInicio.setMonth(dataInicio.getMonth() - (periodoMeses - 1));
-
-    let filteredPeriodo = data.filter(d => {
-        let dataItem = new Date(d.ANO, d.MES - 1, 1);
-        return dataItem >= dataInicio && dataItem <= dataFim && (salaFiltro == "ALL" || d.SALA_FINAL == salaFiltro);
-    });
-
-    // Atualiza Título com o sufixo (ex: ACUMULADO 12M)
-    let sufixo = periodoMeses === 1 ? "" : ` (ACUMULADO ${periodoMeses}M)`;
-    document.getElementById("tituloPrincipal").innerText = 
-        `${salaFiltro === "ALL" ? "GERAL" : "SALA " + salaFiltro} | ${nomesMeses[mesSel]} ${anoSel}${sufixo}`;
-
-    // Cálculos dos Cards (Usando o período acumulado)
-    let atend = filteredPeriodo.length;
-    let receita = filteredPeriodo.reduce((a, b) => a + num(b.VALOR), 0);
-    let diasUnicos = [...new Set(filteredPeriodo.map(d => d.DATA))].length || 1;
-    let capTotal = (salaFiltro === "ALL") 
-        ? Object.values(capacidade).reduce((a,b)=>a+b,0) * diasUnicos 
-        : (capacidade[salaFiltro] || 0) * diasUnicos;
-
-    document.getElementById("att").innerText = `${atend} / ${capTotal}`;
-    document.getElementById("rec").innerText = "R$ " + receita.toLocaleString("pt-BR");
-    document.getElementById("occ").innerText = capTotal ? ((atend/capTotal)*100).toFixed(1) + "%" : "0%";
-    document.getElementById("ticket").innerText = "R$ " + (atend ? (receita/atend).toLocaleString("pt-BR", {maximumFractionDigits: 0}) : "0");
-
-    // Controle de Visibilidade dos Gráficos
-   if (salaFiltro === "ALL") {
-    container.classList.add("modo-geral");
-    document.getElementById("calendar").style.display = "none";
-    document.getElementById("chartCapacidade").style.display = "block";
-
-    // Títulos Dinâmicos com o Período Selecionado
-    document.getElementById("tituloEsquerdo").innerText = `Ocupação por Sala (${periodoMeses}M)`;
-    document.getElementById("tituloDireito").innerText = `Receita por Sala (${periodoMeses}M)`;
-    
-    // Limpa a legenda que sobra do Histórico Regressivo
-    document.getElementById("legendCustom").innerHTML = "";
-
-    buildChartCapacidade(filteredPeriodo, diasUnicos);
-    buildChartReceita(filteredPeriodo);
-} else {
-        container.classList.remove("modo-geral");
-        document.getElementById("calendar").style.display = "table";
-        document.getElementById("chartCapacidade").style.display = "none";
-        document.getElementById("tituloEsquerdo").innerText = `Calendário (${nomesMeses[mesSel]})`;
-        document.getElementById("tituloDireito").innerText = `Histórico Regressivo (${periodoMeses}M)`;
-        
-        buildCalendar(filteredMes); // Só o mês
-        buildChartTrendBars(salaFiltro, anoSel, mesSel, periodoMeses); // Período dinâmico
-    }
-}
-function buildChartTrendBars(sala, ano, mesRef, qtdMeses) {
-    let m = parseInt(mesRef);
-    let a = parseInt(ano);
-    let periodos = [];
-    
-    // Agora gera os meses na ordem: ATUAL -> PASSADO
-    for(let i=0; i < qtdMeses; i++) {
-        let tempM = m - i;
-        let tempA = a;
-        // Lógica para voltar o ano quando o mês for menor que 1
-        while(tempM <= 0) { 
-            tempM += 12; 
-            tempA -= 1; 
-        }
-        periodos.push({ m: tempM, a: tempA });
-    }
-
-    // REMOVI O .REVERSE() - Agora o primeiro item é o mês selecionado
-    let stats = periodos.map(p => {
-        let f = data.filter(d => d.SALA_FINAL === sala && d.MES == p.m && d.ANO == p.a);
-        let rec = f.reduce((acc, b) => acc + num(b.VALOR), 0);
-        let dias = [...new Set(f.map(d => d.DATA))].length || 1;
-        let cap = dias * (capacidade[sala] || 30);
-        let ocup = cap ? (f.length / cap) * 100 : 0;
-        return { 
-            label: `${nomesMeses[p.m].substring(0,3)}/${String(p.a).substring(2)}`, 
-            rec, 
-            ocup 
-        };
-    });
-
-    if (chartRight) chartRight.destroy();
-
-    chartRight = new Chart(document.getElementById("chartRight"), {
-        type: 'bar',
-        data: {
-            labels: stats.map(s => s.label),
-            datasets: [
-                { 
-                    label: 'Receita', 
-                    data: stats.map(s => s.rec), 
-                    backgroundColor: '#3a86ff', 
-                    yAxisID: 'y',
-                    barPercentage: 0.8,
-                    categoryPercentage: 0.7
-                },
-                { 
-                    label: 'Ocupação %', 
-                    data: stats.map(s => s.ocup), 
-                    backgroundColor: '#f2c94c', 
-                    yAxisID: 'y1',
-                    barPercentage: 0.8,
-                    categoryPercentage: 0.7
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 15, right: 10 } },
-            scales: {
-                y: { beginAtZero: true, display: false, grace: '25%' },
-                y1: { beginAtZero: true, max: 130, display: false },
-                x: { 
-                    grid: { display: false }, 
-                    ticks: { 
-                        color: '#fff',
-                        font: { size: qtdMeses > 6 ? 9 : 11 } 
-                    } 
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                datalabels: {
-                    color: '#fff',
-                    anchor: 'end',
-                    align: 'top',
-                    offset: 2,
-                    font: { 
-                        weight: 'bold', 
-                        size: qtdMeses > 6 ? 8 : (window.innerWidth < 600 ? 10 : 12) 
-                    },
-                    formatter: (v, ctx) => 
-                        ctx.datasetIndex === 1 
-                            ? v.toFixed(0) + '%' 
-                            : 'R$ ' + (v/1000).toFixed(0) + 'k'
-                }
-            }
-        }
-    });
-
-    document.getElementById("legendCustom").innerHTML = `
-        <span style="margin-right:12px;"><span style="display:inline-block;width:10px;height:10px;background:#3a86ff;margin-right:4px;"></span>Receita</span>
-        <span><span style="display:inline-block;width:10px;height:10px;background:#f2c94c;margin-right:4px;"></span>Ocupação %</span>
-    `;
-}
-
-function buildChartCapacidade(dados, dias) {
-    let stats = {};
-    Object.keys(capacidade).forEach(s => stats[s] = { atend: 0, cap: capacidade[s] * dias });
-    dados.forEach(d => { if(stats[d.SALA_FINAL]) stats[d.SALA_FINAL].atend++; });
-    const labels = Object.keys(stats);
-    
-    if (chartCapacidade) chartCapacidade.destroy();
-    chartCapacidade = new Chart(document.getElementById("chartCapacidade"), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{ 
-                data: labels.map(s => stats[s].atend), 
-                backgroundColor: labels.map(s => {
-                    let p = (stats[s].atend / stats[s].cap) * 100;
-                    return p >= 70 ? '#1faa59' : p >= 50 ? '#f2c94c' : '#eb5757';
-                }),
-                barPercentage: 0.7,
-                categoryPercentage: 0.8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 30, bottom: 10 } },
-            scales: { 
-                y: { 
-                    beginAtZero: true,
-                    grace: '20%',
-                    grid: { color: 'rgba(255,255,255,0.1)' }, 
-                    ticks: { color: '#aaa', font: { size: 10 } } 
-                },
-                x: { ticks: { color: '#fff' }, grid: { display: false } }
-            },
-            plugins: { 
-                legend: { display: false }, 
-                datalabels: { 
-                    align: 'top', anchor: 'end', color: '#fff', 
-                    font: { weight: 'bold', size: 10 },
-                    formatter: (v, ctx) => {
-                        let cap = stats[ctx.chart.data.labels[ctx.dataIndex]].cap;
-                        let p = ((v/cap)*100).toFixed(0);
-                        return `${v}\n(${p}%)`;
-                    }
-                } 
-            }
-        }
-    });
-}
-
-function buildChartReceita(dados) {
-    let recs = {};
-    Object.keys(capacidade).forEach(s => recs[s] = 0);
-    dados.forEach(d => { if(recs[d.SALA_FINAL] !== undefined) recs[d.SALA_FINAL] += num(d.VALOR); });
-    
-    if (chartRight) chartRight.destroy();
-    chartRight = new Chart(document.getElementById("chartRight"), {
-        type: "bar",
-        data: {
-            labels: Object.keys(recs),
-            datasets: [{ 
-                data: Object.values(recs), 
-                backgroundColor: '#3a86ff', 
-                barPercentage: 0.7,
-                categoryPercentage: 0.8 
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 10 } },
-            scales: { 
-                y: { 
-                    beginAtZero: true, 
-                    display: false,
-                    suggestedMax: Math.max(...Object.values(recs)) * 1.3
-                },
-                x: { ticks: { color: '#fff' }, grid: { display: false } }
-            },
-            plugins: { 
-                legend: { display: false }, 
-                datalabels: { 
-                    align: 'top', anchor: 'end', color: '#fff', 
-                    font: { weight: 'bold', size: 10 },
-                    formatter: (v) => 'R$ ' + (v/1000).toFixed(1) + 'k' 
-                } 
-            }
-        }
-    });
-}
-
-function buildCalendar(dataCal) {
-    let cal = document.getElementById("calendar"); cal.innerHTML = "";
-    let diasSem = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-    cal.innerHTML += "<tr>" + diasSem.map(d => `<th>${d}</th>`).join("") + "</tr>";
-    if (!dataCal.length) return;
-    let ano = parseInt(dataCal[0].ANO), mes = parseInt(dataCal[0].MES);
-    let diasMes = new Date(ano, mes, 0).getDate();
-    let primDia = new Date(ano, mes - 1, 1).getDay();
-    let porData = {};
-    dataCal.forEach(d => {
-        if (!porData[d.DATA]) porData[d.DATA] = { qtd: 0, rec: 0, sala: d.SALA_FINAL };
-        porData[d.DATA].qtd++; porData[d.DATA].rec += num(d.VALOR);
-    });
-    let row = "<tr>";
-    for (let i = 0; i < primDia; i++) row += "<td style='background:#111a3a'></td>";
-    for (let d = 1; d <= diasMes; d++) {
-         let key = Object.keys(porData).find(k => parseInt(k.split("/")[0]) === d);
-         let cl = "#1c2541", cont = `<div class="day">${d}</div>`;
-    if (key) {
-	     let cap = capacidade[porData[key].sala];
-         let pct = (porData[key].qtd / capacidade[porData[key].sala])*100;
-            cl = pct >= 70 ? "#1faa59" : pct >= 50 ? "#f2c94c" : "#eb5757";
-            cont += `<div class="cell-content" style="color:${pct >= 50 && pct < 70 ? '#000' : '#fff'}">
-            <div style="font-weight:bold">
-                ${porData[key].qtd} / ${cap} (${pct.toFixed(0)}%)
-            </div>
-            <div style="font-size:10px">
-                R$ ${porData[key].rec.toLocaleString("pt-BR")}
-            </div>
-         </div>`;
-        }
-        row += `<td style="background:${cl}">${cont}</td>`;
-        if ((primDia + d) % 7 === 0) row += "</tr><tr>";
-    }
-    cal.innerHTML += row + "</tr>";
-}
-</script>
 </body>
 </html>
