@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260323-14">
+    <link rel="stylesheet" href="styles.css?v=20260323-15">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260323-14"></script>
+    <script defer src="app.js?v=20260323-15"></script>
 </head>
 <body>
     <div class="login-overlay" id="loginOverlay">
@@ -89,10 +89,26 @@
     </div>
 
     <div class="cardbar">
-        <div class="card"><div class="big" id="att">0</div><div class="card-label">Atendimentos</div></div>
-        <div class="card"><div class="big" id="occ">0%</div><div class="card-label">Ocupacao</div></div>
-        <div class="card"><div class="big" id="rec">R$ 0</div><div class="card-label">Receita</div></div>
-        <div class="card"><div class="big" id="ticket">R$ 0</div><div class="card-label">Ticket medio</div></div>
+        <div class="card">
+            <div class="big" id="att">0</div>
+            <div class="card-label">Atendimentos</div>
+            <div class="card-sub" id="attHoje">Hoje: 0</div>
+        </div>
+        <div class="card">
+            <div class="big" id="occ">0%</div>
+            <div class="card-label">Ocupacao</div>
+            <div class="card-sub" id="occHoje">Hoje: 0%</div>
+        </div>
+        <div class="card">
+            <div class="big" id="rec">R$ 0</div>
+            <div class="card-label">Receita</div>
+            <div class="card-sub" id="recHoje">Hoje: R$ 0</div>
+        </div>
+        <div class="card">
+            <div class="big" id="ticket">R$ 0</div>
+            <div class="card-label">Ticket medio</div>
+            <div class="card-sub" id="ticketHoje">Hoje: R$ 0</div>
+        </div>
     </div>
 
     <div class="container">

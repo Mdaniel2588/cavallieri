@@ -83,9 +83,13 @@ function cacheElements() {
     elements.chartRight = document.getElementById("chartRight");
     elements.container = document.querySelector(".container");
     elements.att = document.getElementById("att");
+    elements.attHoje = document.getElementById("attHoje");
     elements.occ = document.getElementById("occ");
+    elements.occHoje = document.getElementById("occHoje");
     elements.rec = document.getElementById("rec");
+    elements.recHoje = document.getElementById("recHoje");
     elements.ticket = document.getElementById("ticket");
+    elements.ticketHoje = document.getElementById("ticketHoje");
     elements.configCapacidade = document.getElementById("configCapacidade");
     elements.filtrosExclusao = document.getElementById("filtrosExclusao");
 }
@@ -486,9 +490,13 @@ function render() {
     if (!data.length) {
         elements.calendar.replaceChildren();
         elements.att.textContent = "0 / 0";
+        elements.attHoje.textContent = "Hoje: 0 / 0";
         elements.occ.textContent = "0%";
+        elements.occHoje.textContent = "Hoje: 0%";
         elements.rec.textContent = "R$ 0";
+        elements.recHoje.textContent = "Hoje: R$ 0";
         elements.ticket.textContent = "R$ 0";
+        elements.ticketHoje.textContent = "Hoje: R$ 0";
         return;
     }
 
@@ -512,6 +520,8 @@ function render() {
             salasAtivas.includes(item.SALA_FINAL) &&
             (salaFiltro === "ALL" || item.SALA_FINAL === salaFiltro);
     });
+    const hojeTexto = `${String(hoje.getDate()).padStart(2, "0")}/${String(hoje.getMonth() + 1).padStart(2, "0")}/${hoje.getFullYear()}`;
+    const filteredHoje = filteredPeriodo.filter((item) => item.DATA === hojeTexto);
 
     const mesTitulo = recorteAtual === "semana" ? nomesMeses[hoje.getMonth() + 1] : nomesMeses[mesSel];
     const anoTitulo = recorteAtual === "semana" ? hoje.getFullYear() : anoSel;
@@ -521,13 +531,21 @@ function render() {
     elements.tituloPrincipal.textContent = `${salaFiltro === "ALL" ? "GERAL" : `SALA ${salaFiltro}`} | ${mesTitulo} ${anoTitulo}${sufixo}`;
 
     const atendimentos = filteredPeriodo.length;
+    const atendimentosHoje = filteredHoje.length;
     const receita = filteredPeriodo.reduce((acc, item) => acc + num(item.VALOR), 0);
+    const receitaHoje = filteredHoje.reduce((acc, item) => acc + num(item.VALOR), 0);
     const capacidadePeriodo = calcularCapacidadePeriodo(dataInicio, dataFim, salaFiltro, salasAtivas);
+    const capacidadeHoje = calcularCapacidadeHoje(salaFiltro, salasAtivas, dataInicio, dataFim);
+    const ticketHoje = atendimentosHoje ? receitaHoje / atendimentosHoje : 0;
 
     elements.att.textContent = `${atendimentos} / ${capacidadePeriodo}`;
+    elements.attHoje.textContent = `Hoje: ${atendimentosHoje} / ${capacidadeHoje}`;
     elements.rec.textContent = `R$ ${receita.toLocaleString("pt-BR")}`;
+    elements.recHoje.textContent = `Hoje: R$ ${receitaHoje.toLocaleString("pt-BR")}`;
     elements.occ.textContent = capacidadePeriodo ? `${((atendimentos / capacidadePeriodo) * 100).toFixed(1)}%` : "0%";
+    elements.occHoje.textContent = `Hoje: ${capacidadeHoje ? ((atendimentosHoje / capacidadeHoje) * 100).toFixed(1) : "0"}%`;
     elements.ticket.textContent = `R$ ${atendimentos ? (receita / atendimentos).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "0"}`;
+    elements.ticketHoje.textContent = `Hoje: R$ ${ticketHoje.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
 
     if (salaFiltro === "ALL") {
         elements.container.classList.add("modo-geral");
@@ -695,6 +713,20 @@ function calcularCapacidadePeriodo(dataInicio, dataFim, salaSelecionada, salasAt
     const diasUteis = contarDiasUteisNoIntervalo(dataInicio, dataFim);
     const capacidadeSalas = salasConsideradas.reduce((acc, sala) => acc + capacidade[sala], 0);
     return capacidadeSalas * diasUteis;
+}
+
+function calcularCapacidadeHoje(salaSelecionada, salasAtivas = Object.keys(capacidade), dataInicio, dataFim) {
+    const hojeInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0, 0);
+    const hojeFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
+    if (hojeInicio < dataInicio || hojeFim > dataFim || !isDiaUtil(hoje)) {
+        return 0;
+    }
+
+    const salasConsideradas = salaSelecionada === "ALL"
+        ? salasAtivas
+        : salasAtivas.filter((sala) => sala === salaSelecionada);
+
+    return salasConsideradas.reduce((acc, sala) => acc + capacidade[sala], 0);
 }
 
 function buildChartTrendBars(sala, ano, mesRef, qtdMeses) {
