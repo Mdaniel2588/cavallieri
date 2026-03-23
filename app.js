@@ -16,12 +16,14 @@ const nomesMeses = [
 ];
 const opcoesMeses = nomesMeses.slice(1).map((nome, index) => ({ value: index + 1, label: nome }));
 const URL_PUBLICA = "https://opensheet.elk.sh/1y6_yX-8aggFAmbB5tLV0ZSvyh6ffq5-jJbf5VP8DpwM/base";
+const hoje = new Date();
 
 let data = [];
 let salaFiltro = "ALL";
 let periodoMeses = 1;
 let chartRight;
 let chartCapacidade;
+const salasExcluidas = new Set();
 
 const elements = {};
 
@@ -77,6 +79,7 @@ function cacheElements() {
     elements.occ = document.getElementById("occ");
     elements.rec = document.getElementById("rec");
     elements.ticket = document.getElementById("ticket");
+    elements.filtrosExclusao = document.getElementById("filtrosExclusao");
 }
 
 function bindEvents() {
@@ -85,6 +88,9 @@ function bindEvents() {
 
     document.querySelectorAll("#grupoBotoes button").forEach((button) => {
         button.addEventListener("click", () => {
+            if (button.disabled) {
+                return;
+            }
             salaFiltro = button.dataset.sala;
             document.querySelectorAll("#grupoBotoes button").forEach((item) => item.classList.remove("active"));
             button.classList.add("active");
@@ -100,6 +106,9 @@ function bindEvents() {
             render();
         });
     });
+
+    renderFiltrosExclusao();
+    sincronizarBotoesSala();
 }
 
 function preencherMeses() {
@@ -117,6 +126,57 @@ function showStatus(message, type) {
     elements.statusBanner.hidden = false;
     elements.statusBanner.className = `status-banner ${type}`;
     elements.statusBanner.textContent = message;
+}
+
+function renderFiltrosExclusao() {
+    const buttons = Object.keys(capacidade).map((sala) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `btn-exclusao${salasExcluidas.has(sala) ? " excluida" : ""}`;
+        button.textContent = salasExcluidas.has(sala) ? `${sala} OCULTA` : sala;
+        button.addEventListener("click", () => {
+            if (salasExcluidas.has(sala)) {
+                salasExcluidas.delete(sala);
+            } else {
+                salasExcluidas.add(sala);
+                if (salaFiltro === sala) {
+                    salaFiltro = "ALL";
+                    const botaoGeral = document.querySelector('#grupoBotoes button[data-sala="ALL"]');
+                    document.querySelectorAll("#grupoBotoes button").forEach((item) => item.classList.remove("active"));
+                    if (botaoGeral) {
+                        botaoGeral.classList.add("active");
+                    }
+                }
+            }
+            renderFiltrosExclusao();
+            sincronizarBotoesSala();
+            render();
+        });
+        return button;
+    });
+
+    elements.filtrosExclusao.replaceChildren(...buttons);
+}
+
+function sincronizarBotoesSala() {
+    document.querySelectorAll("#grupoBotoes button").forEach((button) => {
+        const sala = button.dataset.sala;
+        const excluida = sala !== "ALL" && salasExcluidas.has(sala);
+        button.disabled = excluida;
+        if (excluida) {
+            button.classList.remove("active");
+        }
+    });
+
+    if (salaFiltro !== "ALL" && salasExcluidas.has(salaFiltro)) {
+        salaFiltro = "ALL";
+    }
+
+    const botaoAtivo = document.querySelector(`#grupoBotoes button[data-sala="${salaFiltro}"]`);
+    if (botaoAtivo) {
+        document.querySelectorAll("#grupoBotoes button").forEach((item) => item.classList.remove("active"));
+        botaoAtivo.classList.add("active");
+    }
 }
 
 function carregarHistoricoLocal() {
@@ -220,7 +280,7 @@ function normalizarRegistro(record) {
     }
 
     const sala = String(record.SALA_FINAL || "").trim();
-    if (salaFiltro !== "ALL" && !capacidade[sala]) {
+    if (!capacidade[sala]) {
         return null;
     }
 
@@ -281,8 +341,12 @@ function render() {
     const anoSel = Number(elements.anoFiltro.value);
     const mesSel = Number(elements.mesFiltro.value);
 
+    const salasAtivas = getSalasAtivas();
     const filteredMes = data.filter((item) =>
-        item.ANO === anoSel && item.MES === mesSel && (salaFiltro === "ALL" || item.SALA_FINAL === salaFiltro)
+        item.ANO === anoSel &&
+        item.MES === mesSel &&
+        salasAtivas.includes(item.SALA_FINAL) &&
+        (salaFiltro === "ALL" || item.SALA_FINAL === salaFiltro)
     );
 
     const dataFim = new Date(anoSel, mesSel, 0);
@@ -293,6 +357,8 @@ function render() {
         const dataItem = new Date(item.ANO, item.MES - 1, 1);
         return dataItem >= dataInicio &&
             dataItem <= dataFim &&
+            registroDentroDaDataCorrente(item) &&
+            salasAtivas.includes(item.SALA_FINAL) &&
             (salaFiltro === "ALL" || item.SALA_FINAL === salaFiltro);
     });
 
@@ -301,14 +367,11 @@ function render() {
 
     const atendimentos = filteredPeriodo.length;
     const receita = filteredPeriodo.reduce((acc, item) => acc + num(item.VALOR), 0);
-    const diasUnicos = [...new Set(filteredPeriodo.map((item) => item.DATA))].length || 1;
-    const capTotal = salaFiltro === "ALL"
-        ? Object.values(capacidade).reduce((acc, value) => acc + value, 0) * diasUnicos
-        : (capacidade[salaFiltro] || 0) * diasUnicos;
+    const capacidadePeriodo = calcularCapacidadePeriodo(dataInicio, dataFim, salaFiltro, salasAtivas);
 
-    elements.att.textContent = `${atendimentos} / ${capTotal}`;
+    elements.att.textContent = `${atendimentos} / ${capacidadePeriodo}`;
     elements.rec.textContent = `R$ ${receita.toLocaleString("pt-BR")}`;
-    elements.occ.textContent = capTotal ? `${((atendimentos / capTotal) * 100).toFixed(1)}%` : "0%";
+    elements.occ.textContent = capacidadePeriodo ? `${((atendimentos / capacidadePeriodo) * 100).toFixed(1)}%` : "0%";
     elements.ticket.textContent = `R$ ${atendimentos ? (receita / atendimentos).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "0"}`;
 
     if (salaFiltro === "ALL") {
@@ -318,8 +381,8 @@ function render() {
         elements.tituloEsquerdo.textContent = `Ocupacao por Sala (${periodoMeses}M)`;
         elements.tituloDireito.textContent = `Receita por Sala (${periodoMeses}M)`;
         elements.legendCustom.replaceChildren();
-        buildChartCapacidade(filteredPeriodo, diasUnicos);
-        buildChartReceita(filteredPeriodo);
+        buildChartCapacidade(filteredPeriodo, dataInicio, dataFim, salasAtivas);
+        buildChartReceita(filteredPeriodo, salasAtivas);
         return;
     }
 
@@ -330,6 +393,73 @@ function render() {
     elements.tituloDireito.textContent = `Historico Regressivo (${periodoMeses}M)`;
     buildCalendar(filteredMes);
     buildChartTrendBars(salaFiltro, anoSel, mesSel, periodoMeses);
+}
+
+function getSalasAtivas() {
+    return Object.keys(capacidade).filter((sala) => !salasExcluidas.has(sala));
+}
+
+function parseDataBr(texto) {
+    const [dia, mes, ano] = String(texto || "").split("/").map(Number);
+    if (!dia || !mes || !ano) {
+        return null;
+    }
+    return new Date(ano, mes - 1, dia);
+}
+
+function registroDentroDaDataCorrente(item) {
+    const dataRegistro = parseDataBr(item.DATA);
+    if (!dataRegistro) {
+        return false;
+    }
+
+    const fimHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
+    return dataRegistro <= fimHoje;
+}
+
+function diasDisponiveisNoMes(ano, mes) {
+    const diasNoMes = new Date(ano, mes, 0).getDate();
+    const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const mesReferencia = new Date(ano, mes - 1, 1);
+
+    if (mesReferencia > inicioMesAtual) {
+        return 0;
+    }
+
+    if (ano === hoje.getFullYear() && mes === hoje.getMonth() + 1) {
+        return hoje.getDate();
+    }
+
+    return diasNoMes;
+}
+
+function listarMesesNoPeriodo(dataInicio, dataFim) {
+    const cursor = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), 1);
+    const limite = new Date(dataFim.getFullYear(), dataFim.getMonth(), 1);
+    const meses = [];
+
+    while (cursor <= limite) {
+        meses.push({ ano: cursor.getFullYear(), mes: cursor.getMonth() + 1 });
+        cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return meses;
+}
+
+function calcularCapacidadePeriodo(dataInicio, dataFim, salaSelecionada, salasAtivas) {
+    const salasConsideradas = salaSelecionada === "ALL"
+        ? salasAtivas
+        : salasAtivas.filter((sala) => sala === salaSelecionada);
+
+    if (!salasConsideradas.length) {
+        return 0;
+    }
+
+    return listarMesesNoPeriodo(dataInicio, dataFim).reduce((total, periodo) => {
+        const dias = diasDisponiveisNoMes(periodo.ano, periodo.mes);
+        const capacidadeSalas = salasConsideradas.reduce((acc, sala) => acc + capacidade[sala], 0);
+        return total + (capacidadeSalas * dias);
+    }, 0);
 }
 
 function buildChartTrendBars(sala, ano, mesRef, qtdMeses) {
@@ -346,10 +476,15 @@ function buildChartTrendBars(sala, ano, mesRef, qtdMeses) {
     }
 
     const stats = periodos.map((periodo) => {
-        const registros = data.filter((item) => item.SALA_FINAL === sala && item.MES === periodo.m && item.ANO === periodo.a);
+        const registros = data.filter((item) =>
+            item.SALA_FINAL === sala &&
+            item.MES === periodo.m &&
+            item.ANO === periodo.a &&
+            registroDentroDaDataCorrente(item)
+        );
         const receita = registros.reduce((acc, item) => acc + num(item.VALOR), 0);
-        const dias = [...new Set(registros.map((item) => item.DATA))].length || 1;
-        const capacidadePeriodo = dias * (capacidade[sala] || 30);
+        const dias = diasDisponiveisNoMes(periodo.a, periodo.m);
+        const capacidadePeriodo = dias * (capacidade[sala] || 0);
         const ocupacao = capacidadePeriodo ? (registros.length / capacidadePeriodo) * 100 : 0;
 
         return {
@@ -430,10 +565,10 @@ function buildChartTrendBars(sala, ano, mesRef, qtdMeses) {
     elements.legendCustom.replaceChildren(receitaItem, ocupacaoItem);
 }
 
-function buildChartCapacidade(dados, dias) {
+function buildChartCapacidade(dados, dataInicio, dataFim, salasAtivas) {
     const stats = {};
-    Object.keys(capacidade).forEach((sala) => {
-        stats[sala] = { atend: 0, cap: capacidade[sala] * dias };
+    salasAtivas.forEach((sala) => {
+        stats[sala] = { atend: 0, cap: calcularCapacidadePeriodo(dataInicio, dataFim, sala, salasAtivas) };
     });
 
     dados.forEach((item) => {
@@ -493,9 +628,9 @@ function buildChartCapacidade(dados, dias) {
     });
 }
 
-function buildChartReceita(dados) {
+function buildChartReceita(dados, salasAtivas) {
     const receitas = {};
-    Object.keys(capacidade).forEach((sala) => {
+    salasAtivas.forEach((sala) => {
         receitas[sala] = 0;
     });
 

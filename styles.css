@@ -65,6 +65,24 @@ body {
     flex-wrap: wrap;
 }
 
+#filtrosExclusao {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-exclusao {
+    background: #2b355f;
+    border-color: #8fb6ff;
+}
+
+.btn-exclusao.excluida {
+    background: #5c1d2b !important;
+    border-color: #ff8aa1;
+    color: #ffe3e7;
+    box-shadow: none;
+}
+
 button {
     padding: 8px 16px;
     border: none;
@@ -79,6 +97,12 @@ button {
 button.active {
     background-color: #3a86ff !important;
     box-shadow: 0 0 10px rgba(58, 134, 255, 0.5);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 select {
