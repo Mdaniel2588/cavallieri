@@ -1,4 +1,5 @@
-const capacidade = { "306": 38, "307": 30, "313": 20, "602": 40, "606": 40 };
+const capacidadePadrao = { "306": 38, "307": 30, "313": 20, "602": 40, "606": 40 };
+const capacidade = { ...capacidadePadrao };
 const nomesMeses = [
     "",
     "Janeiro",
@@ -17,13 +18,13 @@ const nomesMeses = [
 const opcoesMeses = nomesMeses.slice(1).map((nome, index) => ({ value: index + 1, label: nome }));
 const URL_PUBLICA = "https://opensheet.elk.sh/1y6_yX-8aggFAmbB5tLV0ZSvyh6ffq5-jJbf5VP8DpwM/base";
 const hoje = new Date();
+const STORAGE_CAPACIDADE = "cavalieri_capacidade_diaria";
 
 let data = [];
 let salaFiltro = "ALL";
 let periodoMeses = 1;
 let chartRight;
 let chartCapacidade;
-const salasExcluidas = new Set();
 
 const elements = {};
 
@@ -79,7 +80,7 @@ function cacheElements() {
     elements.occ = document.getElementById("occ");
     elements.rec = document.getElementById("rec");
     elements.ticket = document.getElementById("ticket");
-    elements.filtrosExclusao = document.getElementById("filtrosExclusao");
+    elements.configCapacidade = document.getElementById("configCapacidade");
 }
 
 function bindEvents() {
@@ -107,8 +108,8 @@ function bindEvents() {
         });
     });
 
-    renderFiltrosExclusao();
-    sincronizarBotoesSala();
+    carregarCapacidadeSalva();
+    renderConfigCapacidade();
 }
 
 function preencherMeses() {
@@ -128,55 +129,65 @@ function showStatus(message, type) {
     elements.statusBanner.textContent = message;
 }
 
-function renderFiltrosExclusao() {
-    const buttons = Object.keys(capacidade).map((sala) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = `btn-exclusao${salasExcluidas.has(sala) ? " excluida" : ""}`;
-        button.textContent = salasExcluidas.has(sala) ? `${sala} OCULTA` : sala;
-        button.addEventListener("click", () => {
-            if (salasExcluidas.has(sala)) {
-                salasExcluidas.delete(sala);
-            } else {
-                salasExcluidas.add(sala);
-                if (salaFiltro === sala) {
-                    salaFiltro = "ALL";
-                    const botaoGeral = document.querySelector('#grupoBotoes button[data-sala="ALL"]');
-                    document.querySelectorAll("#grupoBotoes button").forEach((item) => item.classList.remove("active"));
-                    if (botaoGeral) {
-                        botaoGeral.classList.add("active");
-                    }
-                }
-            }
-            renderFiltrosExclusao();
-            sincronizarBotoesSala();
-            render();
-        });
-        return button;
-    });
+function carregarCapacidadeSalva() {
+    try {
+        const bruto = window.localStorage.getItem(STORAGE_CAPACIDADE);
+        if (!bruto) {
+            return;
+        }
 
-    elements.filtrosExclusao.replaceChildren(...buttons);
+        const salvo = JSON.parse(bruto);
+        Object.keys(capacidade).forEach((sala) => {
+            const valor = Number(salvo[sala]);
+            if (Number.isFinite(valor) && valor > 0) {
+                capacidade[sala] = valor;
+            }
+        });
+    } catch (error) {
+        console.error("Falha ao carregar capacidade salva:", error);
+    }
 }
 
-function sincronizarBotoesSala() {
-    document.querySelectorAll("#grupoBotoes button").forEach((button) => {
-        const sala = button.dataset.sala;
-        const excluida = sala !== "ALL" && salasExcluidas.has(sala);
-        button.disabled = excluida;
-        if (excluida) {
-            button.classList.remove("active");
-        }
+function salvarCapacidade() {
+    try {
+        window.localStorage.setItem(STORAGE_CAPACIDADE, JSON.stringify(capacidade));
+    } catch (error) {
+        console.error("Falha ao salvar capacidade:", error);
+    }
+}
+
+function renderConfigCapacidade() {
+    const items = Object.keys(capacidade).map((sala) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "capacidade-item";
+
+        const label = document.createElement("label");
+        label.htmlFor = `capacidade-${sala}`;
+        label.textContent = sala;
+
+        const input = document.createElement("input");
+        input.id = `capacidade-${sala}`;
+        input.type = "number";
+        input.min = "1";
+        input.step = "1";
+        input.value = String(capacidade[sala]);
+        input.addEventListener("change", () => {
+            const valor = Number(input.value);
+            if (!Number.isFinite(valor) || valor <= 0) {
+                input.value = String(capacidade[sala]);
+                return;
+            }
+            capacidade[sala] = valor;
+            salvarCapacidade();
+            render();
+        });
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        return wrapper;
     });
 
-    if (salaFiltro !== "ALL" && salasExcluidas.has(salaFiltro)) {
-        salaFiltro = "ALL";
-    }
-
-    const botaoAtivo = document.querySelector(`#grupoBotoes button[data-sala="${salaFiltro}"]`);
-    if (botaoAtivo) {
-        document.querySelectorAll("#grupoBotoes button").forEach((item) => item.classList.remove("active"));
-        botaoAtivo.classList.add("active");
-    }
+    elements.configCapacidade.replaceChildren(...items);
 }
 
 function carregarHistoricoLocal() {
@@ -341,11 +352,9 @@ function render() {
     const anoSel = Number(elements.anoFiltro.value);
     const mesSel = Number(elements.mesFiltro.value);
 
-    const salasAtivas = getSalasAtivas();
     const filteredMes = data.filter((item) =>
         item.ANO === anoSel &&
         item.MES === mesSel &&
-        salasAtivas.includes(item.SALA_FINAL) &&
         (salaFiltro === "ALL" || item.SALA_FINAL === salaFiltro)
     );
 
@@ -358,7 +367,6 @@ function render() {
         return dataItem >= dataInicio &&
             dataItem <= dataFim &&
             registroDentroDaDataCorrente(item) &&
-            salasAtivas.includes(item.SALA_FINAL) &&
             (salaFiltro === "ALL" || item.SALA_FINAL === salaFiltro);
     });
 
@@ -367,7 +375,7 @@ function render() {
 
     const atendimentos = filteredPeriodo.length;
     const receita = filteredPeriodo.reduce((acc, item) => acc + num(item.VALOR), 0);
-    const capacidadePeriodo = calcularCapacidadePeriodo(dataInicio, dataFim, salaFiltro, salasAtivas);
+    const capacidadePeriodo = calcularCapacidadePeriodo(dataInicio, dataFim, salaFiltro);
 
     elements.att.textContent = `${atendimentos} / ${capacidadePeriodo}`;
     elements.rec.textContent = `R$ ${receita.toLocaleString("pt-BR")}`;
@@ -381,8 +389,8 @@ function render() {
         elements.tituloEsquerdo.textContent = `Ocupacao por Sala (${periodoMeses}M)`;
         elements.tituloDireito.textContent = `Receita por Sala (${periodoMeses}M)`;
         elements.legendCustom.replaceChildren();
-        buildChartCapacidade(filteredPeriodo, dataInicio, dataFim, salasAtivas);
-        buildChartReceita(filteredPeriodo, salasAtivas);
+        buildChartCapacidade(filteredPeriodo, dataInicio, dataFim);
+        buildChartReceita(filteredPeriodo);
         return;
     }
 
@@ -393,10 +401,6 @@ function render() {
     elements.tituloDireito.textContent = `Historico Regressivo (${periodoMeses}M)`;
     buildCalendar(filteredMes);
     buildChartTrendBars(salaFiltro, anoSel, mesSel, periodoMeses);
-}
-
-function getSalasAtivas() {
-    return Object.keys(capacidade).filter((sala) => !salasExcluidas.has(sala));
 }
 
 function parseDataBr(texto) {
@@ -446,10 +450,10 @@ function listarMesesNoPeriodo(dataInicio, dataFim) {
     return meses;
 }
 
-function calcularCapacidadePeriodo(dataInicio, dataFim, salaSelecionada, salasAtivas) {
+function calcularCapacidadePeriodo(dataInicio, dataFim, salaSelecionada) {
     const salasConsideradas = salaSelecionada === "ALL"
-        ? salasAtivas
-        : salasAtivas.filter((sala) => sala === salaSelecionada);
+        ? Object.keys(capacidade)
+        : Object.keys(capacidade).filter((sala) => sala === salaSelecionada);
 
     if (!salasConsideradas.length) {
         return 0;
@@ -565,10 +569,10 @@ function buildChartTrendBars(sala, ano, mesRef, qtdMeses) {
     elements.legendCustom.replaceChildren(receitaItem, ocupacaoItem);
 }
 
-function buildChartCapacidade(dados, dataInicio, dataFim, salasAtivas) {
+function buildChartCapacidade(dados, dataInicio, dataFim) {
     const stats = {};
-    salasAtivas.forEach((sala) => {
-        stats[sala] = { atend: 0, cap: calcularCapacidadePeriodo(dataInicio, dataFim, sala, salasAtivas) };
+    Object.keys(capacidade).forEach((sala) => {
+        stats[sala] = { atend: 0, cap: calcularCapacidadePeriodo(dataInicio, dataFim, sala) };
     });
 
     dados.forEach((item) => {
@@ -628,9 +632,9 @@ function buildChartCapacidade(dados, dataInicio, dataFim, salasAtivas) {
     });
 }
 
-function buildChartReceita(dados, salasAtivas) {
+function buildChartReceita(dados) {
     const receitas = {};
-    salasAtivas.forEach((sala) => {
+    Object.keys(capacidade).forEach((sala) => {
         receitas[sala] = 0;
     });
 
