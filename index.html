@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260323-11">
+    <link rel="stylesheet" href="styles.css?v=20260323-12">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260323-11"></script>
+    <script defer src="app.js?v=20260323-12"></script>
 </head>
 <body>
     <div class="login-overlay" id="loginOverlay">
@@ -31,53 +31,60 @@
     <div class="status-banner" id="statusBanner" hidden></div>
 
     <div class="filters">
-        <div class="filter-row">
-            <span class="filter-label">Periodo</span>
-            <div class="filter-controls">
-                <select id="anoFiltro"></select>
-                <select id="mesFiltro"></select>
+        <div class="filters-main">
+            <div class="filter-inline">
+                <span class="filter-label">Periodo</span>
+                <div class="filter-controls">
+                    <select id="anoFiltro"></select>
+                    <select id="mesFiltro"></select>
+                </div>
+            </div>
+
+            <div class="filter-inline" id="grupoBotoes">
+                <span class="filter-label">Salas</span>
+                <div class="filter-controls">
+                    <button class="active" data-sala="ALL">VISAO GERAL</button>
+                    <button data-sala="306">306</button>
+                    <button data-sala="307">307</button>
+                    <button data-sala="313">313</button>
+                    <button data-sala="602">602</button>
+                    <button data-sala="606">606</button>
+                </div>
+            </div>
+
+            <div class="filter-inline" id="grupoPeriodo">
+                <span class="filter-label">Visualizacao</span>
+                <div class="filter-controls">
+                    <button class="active btn-periodo" data-periodo="1">MENSAL</button>
+                    <button class="btn-periodo" data-periodo="3">3 MESES</button>
+                    <button class="btn-periodo" data-periodo="6">6 MESES</button>
+                    <button class="btn-periodo" data-periodo="12">12 MESES</button>
+                </div>
+            </div>
+
+            <div class="filter-inline" id="grupoRecorte">
+                <span class="filter-label">Recorte</span>
+                <div class="filter-controls">
+                    <button class="active btn-recorte" data-recorte="periodo">PERIODO</button>
+                    <button class="btn-recorte" data-recorte="semana">SEMANA CORRENTE</button>
+                </div>
             </div>
         </div>
 
-        <div class="filter-row" id="grupoBotoes">
-            <span class="filter-label">Salas</span>
-            <div class="filter-controls">
-                <button class="active" data-sala="ALL">VISAO GERAL</button>
-                <button data-sala="306">306</button>
-                <button data-sala="307">307</button>
-                <button data-sala="313">313</button>
-                <button data-sala="602">602</button>
-                <button data-sala="606">606</button>
+        <details class="filters-advanced">
+            <summary>Ajustes Avancados</summary>
+            <div class="filters-advanced-grid">
+                <div class="filter-row">
+                    <span class="filter-label">Capacidade diaria</span>
+                    <div id="configCapacidade" class="config-capacidade"></div>
+                </div>
+
+                <div class="filter-row">
+                    <span class="filter-label">Ocultar salas</span>
+                    <div id="filtrosExclusao" class="config-capacidade"></div>
+                </div>
             </div>
-        </div>
-
-        <div class="filter-row" id="grupoPeriodo">
-            <span class="filter-label">Visualizacao</span>
-            <div class="filter-controls">
-                <button class="active btn-periodo" data-periodo="1">MENSAL</button>
-                <button class="btn-periodo" data-periodo="3">3 MESES</button>
-                <button class="btn-periodo" data-periodo="6">6 MESES</button>
-                <button class="btn-periodo" data-periodo="12">12 MESES</button>
-            </div>
-        </div>
-
-        <div class="filter-row" id="grupoRecorte">
-            <span class="filter-label">Recorte</span>
-            <div class="filter-controls">
-                <button class="active btn-recorte" data-recorte="periodo">PERIODO</button>
-                <button class="btn-recorte" data-recorte="semana">SEMANA CORRENTE</button>
-            </div>
-        </div>
-
-        <div class="filter-row">
-            <span class="filter-label">Capacidade diaria</span>
-            <div id="configCapacidade" class="config-capacidade"></div>
-        </div>
-
-        <div class="filter-row">
-            <span class="filter-label">Ocultar salas</span>
-            <div id="filtrosExclusao" class="config-capacidade"></div>
-        </div>
+        </details>
     </div>
 
     <div class="cardbar">
