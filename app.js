@@ -70,6 +70,7 @@ function cacheElements() {
     elements.loginUsuario = document.getElementById("loginUsuario");
     elements.loginSenha = document.getElementById("loginSenha");
     elements.loginErro = document.getElementById("loginErro");
+    elements.logoutButton = document.getElementById("logoutButton");
     elements.anoFiltro = document.getElementById("anoFiltro");
     elements.mesFiltro = document.getElementById("mesFiltro");
     elements.statusBanner = document.getElementById("statusBanner");
@@ -111,6 +112,8 @@ function bindLogin() {
         liberarDashboard();
         await iniciarDashboard();
     });
+
+    elements.logoutButton.addEventListener("click", sair);
 }
 
 function validarSessaoLogin() {
@@ -123,6 +126,11 @@ function bloquearDashboard() {
 
 function liberarDashboard() {
     elements.loginOverlay.classList.add("hidden");
+}
+
+function sair() {
+    window.localStorage.removeItem(STORAGE_LOGIN);
+    window.location.reload();
 }
 
 function bindEvents() {

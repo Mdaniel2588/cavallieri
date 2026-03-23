@@ -94,6 +94,13 @@ body {
     font-size: 20px;
 }
 
+.logout-button {
+    padding: 8px 14px;
+    background: #1d2a57;
+    border: 1px solid #5b8fff;
+    color: #fff;
+}
+
 .main-title-banner {
     background: linear-gradient(90deg, #111a3a 0%, #3a86ff 50%, #111a3a 100%);
     text-align: center;
