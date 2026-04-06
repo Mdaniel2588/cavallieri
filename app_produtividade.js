@@ -1,7 +1,7 @@
 /* ─── Produtividade — Clinica Cavallieri ─────────────────────────────── */
 
-const API_PRODUTIVIDADE = "https://kliniki.cavalliericlinica.com.br:444/klinikinew/clinic_bridge/produtividade/resumo";
-const API_DIARIO        = "https://kliniki.cavalliericlinica.com.br:444/klinikinew/clinic_bridge/produtividade/diario";
+const API_PRODUTIVIDADE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/resumo";
+const API_DIARIO        = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/diario";
 
 let prodData = null;
 let prodDiario = null;
