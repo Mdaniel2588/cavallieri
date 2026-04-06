@@ -13,11 +13,13 @@ const OCTA_KLINIKI_MAP = {
 };
 
 const STORAGE_SETORES = "cavalieri_setores";
+const STORAGE_OCULTOS = "cavalieri_ocultos";
+const STORAGE_ESCONDER_MEDICOS = "cavalieri_esconder_medicos";
+
 let prodData = null;
-let prodDiario = null;
+let prodRefreshTimer = null;
 let chartProdRanking = null;
 let chartProdWhats = null;
-let prodRefreshTimer = null;
 const prodElements = {};
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -34,6 +36,15 @@ function getSetoresConfig() {
     return {};
 }
 function salvarSetores(s) { window.localStorage.setItem(STORAGE_SETORES, JSON.stringify(s)); }
+
+function getOcultos() {
+    try { const r = window.localStorage.getItem(STORAGE_OCULTOS); if (r) return JSON.parse(r); } catch (e) {}
+    return [];
+}
+function salvarOcultos(arr) { window.localStorage.setItem(STORAGE_OCULTOS, JSON.stringify(arr)); }
+
+function getMedicosEscondidos() { return window.localStorage.getItem(STORAGE_ESCONDER_MEDICOS) === "1"; }
+function salvarMedicosEscondidos(v) { window.localStorage.setItem(STORAGE_ESCONDER_MEDICOS, v ? "1" : "0"); }
 
 function classUsuario(u) {
     const cfg = getSetoresConfig();
@@ -64,8 +75,19 @@ function buildOctaPorSigla(octadesk) {
 }
 
 function isHoje() {
-    const hoje = new Date();
-    return prodElements.anoProd.value == hoje.getFullYear() && prodElements.mesProd.value == (hoje.getMonth() + 1);
+    const h = new Date();
+    return prodElements.anoProd.value == h.getFullYear() && prodElements.mesProd.value == (h.getMonth() + 1);
+}
+
+function isOculto(sigla) { return getOcultos().indexOf(sigla) >= 0; }
+
+function toggleOculto(sigla) {
+    const arr = getOcultos();
+    const idx = arr.indexOf(sigla);
+    if (idx >= 0) arr.splice(idx, 1);
+    else arr.push(sigla);
+    salvarOcultos(arr);
+    renderProdutividade();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
@@ -74,7 +96,6 @@ function initProdutividade() {
     prodElements.section       = document.getElementById("secaoProdutividade");
     prodElements.anoProd       = document.getElementById("anoProd");
     prodElements.mesProd       = document.getElementById("mesProd");
-    prodElements.diaProd       = document.getElementById("diaProd");
     prodElements.btnAtualizar  = document.getElementById("btnAtualizarProd");
     prodElements.btnHoje       = document.getElementById("btnHojeProd");
     prodElements.tabela        = document.getElementById("tabelaProd");
@@ -93,9 +114,9 @@ function initProdutividade() {
     prodElements.mesProd.addEventListener("change", carregarProdutividade);
     if (prodElements.btnHoje) {
         prodElements.btnHoje.addEventListener("click", () => {
-            const hoje = new Date();
-            prodElements.anoProd.value = hoje.getFullYear();
-            prodElements.mesProd.value = hoje.getMonth() + 1;
+            const h = new Date();
+            prodElements.anoProd.value = h.getFullYear();
+            prodElements.mesProd.value = h.getMonth() + 1;
             carregarProdutividade();
             iniciarAutoRefresh();
         });
@@ -103,21 +124,15 @@ function initProdutividade() {
 }
 
 function preencherFiltrosProd() {
-    const hoje = new Date();
-    const anoAtual = hoje.getFullYear();
-    for (let a = anoAtual; a >= anoAtual - 3; a--) {
-        const opt = document.createElement("option");
-        opt.value = a; opt.textContent = a;
-        prodElements.anoProd.appendChild(opt);
+    const h = new Date();
+    for (let a = h.getFullYear(); a >= h.getFullYear() - 3; a--) {
+        const o = document.createElement("option"); o.value = a; o.textContent = a;
+        prodElements.anoProd.appendChild(o);
     }
-    const meses = ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    meses.forEach((m, i) => {
-        const opt = document.createElement("option");
-        opt.value = i + 1; opt.textContent = m;
-        prodElements.mesProd.appendChild(opt);
-    });
-    prodElements.anoProd.value = anoAtual;
-    prodElements.mesProd.value = hoje.getMonth() + 1;
+    ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
+        .forEach((m, i) => { const o = document.createElement("option"); o.value = i+1; o.textContent = m; prodElements.mesProd.appendChild(o); });
+    prodElements.anoProd.value = h.getFullYear();
+    prodElements.mesProd.value = h.getMonth() + 1;
 }
 
 function iniciarAutoRefresh() {
@@ -125,27 +140,22 @@ function iniciarAutoRefresh() {
     prodRefreshTimer = setInterval(() => {
         if (isHoje()) carregarProdutividade();
         else { clearInterval(prodRefreshTimer); prodRefreshTimer = null; }
-    }, 120000); // 2 min
+    }, 120000);
 }
 
 async function carregarProdutividade() {
     const ano = prodElements.anoProd.value;
     const mes = prodElements.mesProd.value;
-    showProdStatus("Carregando dados...", "info");
+    showProdStatus("Carregando...", "info");
     try {
         const res = await fetch(`${API_PRODUTIVIDADE}?ano=${ano}&mes=${mes}&com_3cx=1&com_octa=1`);
         const json = await res.json();
-        if (!json.ok) throw new Error(json.erro || "Erro na API");
+        if (!json.ok) throw new Error(json.erro || "Erro");
         prodData = json.data;
         renderProdutividade();
         hideProdStatus();
-        if (isHoje()) {
-            showProdStatus("Realtime ativo — atualiza a cada 2 min", "info");
-            setTimeout(hideProdStatus, 3000);
-        }
-    } catch (err) {
-        showProdStatus("Falha ao carregar: " + err.message, "error");
-    }
+        if (isHoje()) { showProdStatus("Realtime — atualiza a cada 2 min", "info"); setTimeout(hideProdStatus, 3000); }
+    } catch (err) { showProdStatus("Falha: " + err.message, "error"); }
 }
 
 function showProdStatus(msg, type) {
@@ -156,7 +166,7 @@ function showProdStatus(msg, type) {
 }
 function hideProdStatus() { if (prodElements.statusProd) prodElements.statusProd.hidden = true; }
 
-// ── Render Principal ──────────────────────────────────────────────────
+// ── Render ────────────────────────────────────────────────────────────
 
 function renderProdutividade() {
     if (!prodData) return;
@@ -165,7 +175,7 @@ function renderProdutividade() {
     const octadesk = prodData.octadesk || [];
     const octaPorSigla = buildOctaPorSigla(octadesk);
 
-    renderCardsTotais(usuarios, ligacoes, octadesk, octaPorSigla);
+    renderCards(usuarios, ligacoes, octadesk);
     renderTabelas(usuarios, octaPorSigla);
     renderChartRanking(usuarios, octaPorSigla);
     renderChartWhatsapp(octadesk);
@@ -173,63 +183,51 @@ function renderProdutividade() {
 
 // ── Cards ─────────────────────────────────────────────────────────────
 
-function renderCardsTotais(usuarios, ligacoes, octadesk, octaPorSigla) {
-    const totalAtendidas = ligacoes.reduce((s, l) => s + (l.atendidas || 0), 0);
-    const semDados = totalAtendidas === 0;
-
-    prodElements.cardTelefone.innerHTML = `
-        <div class="prod-card-icon">&#128222;</div>
-        <div class="prod-card-title">TELEFONE (3CX)</div>
-        ${semDados
-            ? `<div class="prod-card-big" style="font-size:16px;color:#96b7ff;">Sem dados</div>`
-            : `<div class="prod-card-big">${totalAtendidas}</div>
-               <div class="prod-card-label">Ligacoes Atendidas</div>`}
-    `;
+function renderCards(usuarios, ligacoes, octadesk) {
+    const totalAtend = ligacoes.reduce((s, l) => s + (l.atendidas || 0), 0);
+    prodElements.cardTelefone.innerHTML = totalAtend
+        ? `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE</div>
+           <div class="prod-card-big">${totalAtend}</div><div class="prod-card-label">Ligacoes Atendidas</div>`
+        : `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE</div>
+           <div class="prod-card-big" style="font-size:16px;color:#96b7ff;">Sem dados</div>`;
 
     const totalChats = octadesk.reduce((s, a) => s + (a.total || 0), 0);
-    prodElements.cardWhatsapp.innerHTML = `
-        <div class="prod-card-icon">&#128172;</div>
-        <div class="prod-card-title">WHATSAPP (OCTADESK)</div>
-        <div class="prod-card-big">${totalChats}</div>
-        <div class="prod-card-label">Conversas</div>
-    `;
+    prodElements.cardWhatsapp.innerHTML = `<div class="prod-card-icon">&#128172;</div><div class="prod-card-title">WHATSAPP</div>
+        <div class="prod-card-big">${totalChats}</div><div class="prod-card-label">Conversas</div>`;
 
     const atend = usuarios.filter(isAtendente);
     const totalAg = atend.reduce((s, u) => s + (u.agendamentos || 0), 0);
     const totalCad = atend.reduce((s, u) => s + (u.cadastros_paciente || 0), 0);
-    prodElements.cardConsolid.innerHTML = `
-        <div class="prod-card-icon">&#128200;</div>
-        <div class="prod-card-title">CONSOLIDADO</div>
-        <div class="prod-card-big">${totalAg}</div>
-        <div class="prod-card-label">Agendamentos</div>
-        <div class="prod-card-sub">Cadastros: ${totalCad} | Online: ${prodData.resultados_online || 0}</div>
-    `;
+    prodElements.cardConsolid.innerHTML = `<div class="prod-card-icon">&#128200;</div><div class="prod-card-title">CONSOLIDADO</div>
+        <div class="prod-card-big">${totalAg}</div><div class="prod-card-label">Agendamentos</div>
+        <div class="prod-card-sub">Cadastros: ${totalCad} | Online: ${prodData.resultados_online || 0}</div>`;
 }
 
-// ── Tabelas Segmentadas ───────────────────────────────────────────────
+// ── Tabelas ───────────────────────────────────────────────────────────
 
 function renderTabelas(usuarios, octaPorSigla) {
     if (!prodElements.tabela) return;
+    const ocultos = getOcultos();
     let html = "";
 
     // ── MARCACAO ──
-    const marc = usuarios.filter(u => isMarcacao(u) && ((u.agendamentos || 0) > 0 || (u.ligacoes_atendidas || 0) > 0))
+    const marc = usuarios
+        .filter(u => isMarcacao(u) && !isOculto(u.usuario) && ((u.agendamentos || 0) > 0 || (u.ligacoes_atendidas || 0) > 0))
         .map(u => {
-            const octa = octaPorSigla[u.usuario];
-            const wpp = octa ? octa.total : 0;
-            const total = (u.agendamentos || 0) + (u.ligacoes_atendidas || 0) + wpp;
-            return { ...u, wpp, total };
+            const wpp = (octaPorSigla[u.usuario] || {}).total || 0;
+            const outros = (u.entregas_arquivo || 0) + (u.emails_laudo || 0) + (u.emails_enviados || 0);
+            const total = (u.agendamentos || 0) + (u.ligacoes_atendidas || 0) + wpp + outros;
+            return { ...u, wpp, outros, total };
         }).sort((a, b) => b.total - a.total);
 
     html += `<div class="prod-section-title">MARCACAO</div>`;
     html += `<table class="prod-table"><thead><tr>
         <th>#</th><th>Sigla</th><th>Nome</th>
-        <th>Agendamentos</th><th>Ligacoes</th><th>T.Medio Lig.</th>
-        <th>WhatsApp</th><th>Outros</th><th>TOTAL</th>
+        <th>Agend.</th><th>Ligacoes</th><th>T.Med Lig.</th>
+        <th>WhatsApp</th><th>Outros</th><th>TOTAL</th><th></th>
     </tr></thead><tbody>`;
     let pos = 1;
     for (const u of marc) {
-        const outros = (u.entregas_arquivo || 0) + (u.emails_laudo || 0) + (u.emails_enviados || 0);
         html += `<tr>
             <td class="rank-cell">${pos++}</td>
             <td style="font-weight:bold;">${u.usuario}</td>
@@ -238,24 +236,23 @@ function renderTabelas(usuarios, octaPorSigla) {
             <td class="num-cell">${u.ligacoes_atendidas || '-'}</td>
             <td class="num-cell">${formatSeg(u.tempo_conversa_medio)}</td>
             <td class="num-cell">${u.wpp || '-'}</td>
-            <td class="num-cell">${outros || '-'}</td>
+            <td class="num-cell">${u.outros || '-'}</td>
             <td class="num-cell total-cell">${u.total}</td>
+            <td><button class="btn-ocultar" onclick="toggleOculto('${u.usuario}')">x</button></td>
         </tr>`;
     }
-    const totMarcAg = marc.reduce((s, u) => s + (u.agendamentos || 0), 0);
-    const totMarcLig = marc.reduce((s, u) => s + (u.ligacoes_atendidas || 0), 0);
-    const totMarcWpp = marc.reduce((s, u) => s + u.wpp, 0);
-    const totMarcTot = marc.reduce((s, u) => s + u.total, 0);
-    html += `<tr class="total-row">
-        <td colspan="3" style="text-align:right;">TOTAL</td>
-        <td class="num-cell">${totMarcAg}</td><td class="num-cell">${totMarcLig || '-'}</td><td></td>
-        <td class="num-cell">${totMarcWpp || '-'}</td><td></td>
-        <td class="num-cell total-cell">${totMarcTot}</td>
-    </tr>`;
-    html += "</tbody></table>";
+    const tMAg = marc.reduce((s, u) => s + (u.agendamentos || 0), 0);
+    const tMLig = marc.reduce((s, u) => s + (u.ligacoes_atendidas || 0), 0);
+    const tMWpp = marc.reduce((s, u) => s + u.wpp, 0);
+    const tMTot = marc.reduce((s, u) => s + u.total, 0);
+    html += `<tr class="total-row"><td colspan="3" style="text-align:right;">TOTAL</td>
+        <td class="num-cell">${tMAg}</td><td class="num-cell">${tMLig || '-'}</td><td></td>
+        <td class="num-cell">${tMWpp || '-'}</td><td></td><td class="num-cell total-cell">${tMTot}</td><td></td>
+    </tr></tbody></table>`;
 
     // ── RECEPCAO ──
-    const recep = usuarios.filter(u => isRecepcao(u) && ((u.cadastros_paciente || 0) > 0))
+    const recep = usuarios
+        .filter(u => isRecepcao(u) && !isOculto(u.usuario) && ((u.cadastros_paciente || 0) > 0))
         .map(u => {
             const outros = (u.entregas_arquivo || 0) + (u.emails_laudo || 0) + (u.emails_enviados || 0);
             const total = (u.cadastros_paciente || 0) + outros;
@@ -265,7 +262,7 @@ function renderTabelas(usuarios, octaPorSigla) {
     html += `<div class="prod-section-title">RECEPCAO</div>`;
     html += `<table class="prod-table"><thead><tr>
         <th>#</th><th>Sigla</th><th>Nome</th>
-        <th>Cadastros</th><th>Entregas</th><th>Emails</th><th>TOTAL</th>
+        <th>Cadastros</th><th>Entregas</th><th>Emails</th><th>TOTAL</th><th></th>
     </tr></thead><tbody>`;
     pos = 1;
     for (const u of recep) {
@@ -277,48 +274,61 @@ function renderTabelas(usuarios, octaPorSigla) {
             <td class="num-cell">${u.entregas_arquivo || 0}</td>
             <td class="num-cell">${(u.emails_laudo || 0) + (u.emails_enviados || 0)}</td>
             <td class="num-cell total-cell">${u.total}</td>
+            <td><button class="btn-ocultar" onclick="toggleOculto('${u.usuario}')">x</button></td>
         </tr>`;
     }
-    const totRecCad = recep.reduce((s, u) => s + (u.cadastros_paciente || 0), 0);
-    const totRecTot = recep.reduce((s, u) => s + u.total, 0);
-    html += `<tr class="total-row">
-        <td colspan="3" style="text-align:right;">TOTAL</td>
-        <td class="num-cell">${totRecCad}</td><td></td><td></td>
-        <td class="num-cell total-cell">${totRecTot}</td>
-    </tr>`;
-    html += "</tbody></table>";
+    const tRTot = recep.reduce((s, u) => s + u.total, 0);
+    html += `<tr class="total-row"><td colspan="3" style="text-align:right;">TOTAL</td>
+        <td class="num-cell">${recep.reduce((s,u)=>s+(u.cadastros_paciente||0),0)}</td><td></td><td></td>
+        <td class="num-cell total-cell">${tRTot}</td><td></td>
+    </tr></tbody></table>`;
 
-    // ── MEDICOS ──
-    const medicos = usuarios.filter(u => isMedico(u) && (u.laudos_digitados || 0) > 0)
-        .sort((a, b) => (b.laudos_digitados || 0) - (a.laudos_digitados || 0));
-    if (medicos.length) {
-        html += `<div class="prod-section-title">MEDICOS / LAUDO</div>`;
-        html += `<table class="prod-table"><thead><tr>
-            <th>Sigla</th><th>Nome</th><th>Laudos</th><th>Liberados</th><th>Emails</th><th>Capturas</th>
-        </tr></thead><tbody>`;
-        for (const u of medicos) {
-            html += `<tr>
-                <td style="font-weight:bold;">${u.usuario}</td>
-                <td style="text-align:left;">${u.nome || '-'}</td>
-                <td class="num-cell">${u.laudos_digitados || 0}</td>
-                <td class="num-cell">${u.laudos_liberados || 0}</td>
-                <td class="num-cell">${(u.emails_laudo || 0) + (u.emails_enviados || 0)}</td>
-                <td class="num-cell">${u.capturas || 0}</td>
-            </tr>`;
+    // ── MEDICOS (escondível) ──
+    const esconderMed = getMedicosEscondidos();
+    html += `<div class="prod-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+        MEDICOS / LAUDO
+        <label style="font-size:11px;font-weight:normal;color:#96b7ff;cursor:pointer;">
+            <input type="checkbox" id="chkEsconderMedicos" ${esconderMed ? 'checked' : ''} onchange="salvarMedicosEscondidos(this.checked);renderProdutividade();" /> Esconder
+        </label>
+    </div>`;
+
+    if (!esconderMed) {
+        const medicos = usuarios.filter(u => isMedico(u) && (u.laudos_digitados || 0) > 0)
+            .sort((a, b) => (b.laudos_digitados || 0) - (a.laudos_digitados || 0));
+        if (medicos.length) {
+            html += `<table class="prod-table"><thead><tr>
+                <th>Sigla</th><th>Nome</th><th>Laudos</th><th>Liberados</th><th>Emails</th><th>Capturas</th>
+            </tr></thead><tbody>`;
+            for (const u of medicos) {
+                html += `<tr>
+                    <td style="font-weight:bold;">${u.usuario}</td>
+                    <td style="text-align:left;">${u.nome || '-'}</td>
+                    <td class="num-cell">${u.laudos_digitados || 0}</td>
+                    <td class="num-cell">${u.laudos_liberados || 0}</td>
+                    <td class="num-cell">${(u.emails_laudo || 0) + (u.emails_enviados || 0)}</td>
+                    <td class="num-cell">${u.capturas || 0}</td>
+                </tr>`;
+            }
+            html += "</tbody></table>";
         }
-        html += "</tbody></table>";
+    }
+
+    // ── Usuarios ocultos (restaurar) ──
+    if (ocultos.length) {
+        html += `<div style="margin-top:12px;padding:8px;font-size:11px;color:#96b7ff;">
+            Ocultos: ${ocultos.map(s => `<button class="btn-restaurar" onclick="toggleOculto('${s}')">${s}</button>`).join(' ')}
+        </div>`;
     }
 
     prodElements.tabela.innerHTML = html;
 }
 
-// ── Chart: Ranking Consolidado ────────────────────────────────────────
+// ── Chart: Ranking ────────────────────────────────────────────────────
 
 function renderChartRanking(usuarios, octaPorSigla) {
-    const atendentes = usuarios.filter(u => isAtendente(u))
+    const atendentes = usuarios.filter(u => isAtendente(u) && !isOculto(u.usuario))
         .map(u => {
-            const octa = octaPorSigla[u.usuario];
-            const wpp = octa ? octa.total : 0;
+            const wpp = (octaPorSigla[u.usuario] || {}).total || 0;
             const lig = u.ligacoes_atendidas || 0;
             const ag = u.agendamentos || 0;
             const cad = u.cadastros_paciente || 0;
@@ -345,8 +355,7 @@ function renderChartRanking(usuarios, octaPorSigla) {
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             plugins: {
                 legend: { labels: { color: "#fff", boxWidth: 10, font: { size: 11 } } },
                 datalabels: { display: false }
