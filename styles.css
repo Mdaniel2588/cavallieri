@@ -645,6 +645,46 @@ canvas {
     min-height: 280px;
 }
 
+.num-cell {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.rank-cell {
+    text-align: center;
+    font-weight: bold;
+    color: #f2c94c;
+    width: 30px;
+}
+
+.total-cell {
+    font-weight: bold;
+    color: #4cc9f0;
+    background: rgba(58, 134, 255, 0.08);
+}
+
+.total-row {
+    background: #111a3a;
+    font-weight: bold;
+}
+
+.prod-detalhe {
+    margin: 8px 0;
+    border: 1px solid #2f4f9c;
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: rgba(28, 37, 65, 0.5);
+}
+
+.prod-detalhe summary {
+    cursor: pointer;
+    color: #96b7ff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.prod-table-sm { font-size: 11px; }
+
 /* ── Painel Usuarios ────────────────────────────────────────────── */
 
 .user-form {

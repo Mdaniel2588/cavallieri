@@ -156,10 +156,11 @@
                     </div>
                 </div>
                 <button id="btnAtualizarProd" class="active" type="button">ATUALIZAR</button>
+                <button id="btnHojeProd" type="button" style="background:#1faa59;border-color:#1faa59;">HOJE (REALTIME)</button>
             </div>
         </div>
 
-        <!-- Cards: Telefone | WhatsApp | Consolidado -->
+        <!-- Cards -->
         <div class="prod-cards">
             <div class="prod-card prod-card-phone" id="cardTelefone">
                 <div class="prod-card-title">TELEFONE (3CX)</div>
@@ -170,28 +171,22 @@
                 <div class="prod-card-big">-</div>
             </div>
             <div class="prod-card prod-card-consolid" id="cardConsolidado">
-                <div class="prod-card-title">CONSOLIDADO KLINIKI</div>
+                <div class="prod-card-title">CONSOLIDADO</div>
                 <div class="prod-card-big">-</div>
             </div>
         </div>
 
-        <!-- Tabelas de produtividade segmentadas -->
+        <!-- Tabelas segmentadas -->
         <div class="prod-table-wrapper" id="tabelaProd"></div>
 
         <!-- Graficos -->
         <div class="prod-charts">
             <div class="prod-chart-box">
-                <b>Agendamentos por Usuario</b>
-                <div class="chart-wrapper"><canvas id="chartBarProd"></canvas></div>
-            </div>
-        </div>
-        <div class="prod-charts">
-            <div class="prod-chart-box">
-                <b>Ligacoes por Ramal (3CX)</b>
-                <div class="chart-wrapper"><canvas id="chartPhoneProd"></canvas></div>
+                <b>Ranking Consolidado — Atendentes</b>
+                <div class="chart-wrapper"><canvas id="chartRankingProd"></canvas></div>
             </div>
             <div class="prod-chart-box">
-                <b>Conversas WhatsApp por Agente</b>
+                <b>WhatsApp por Agente</b>
                 <div class="chart-wrapper"><canvas id="chartWhatsProd"></canvas></div>
             </div>
         </div>
