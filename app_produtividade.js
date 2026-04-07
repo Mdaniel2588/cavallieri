@@ -23,7 +23,7 @@ const fmt = s => { if(!s) return '-'; const m=Math.floor(s/60),r=s%60; return m>
 const getOc = () => { try{return JSON.parse(localStorage.getItem(ST_OC))||[];}catch(e){return[];} };
 const isOc = s => getOc().indexOf(s)>=0;
 function toggleOc(s){const a=getOc();const i=a.indexOf(s);if(i>=0)a.splice(i,1);else a.push(s);localStorage.setItem(ST_OC,JSON.stringify(a));renderProd();}
-function buildOcta(o){const r={};for(const a of(o||[])){const s=OCTA_MAP[a.agente];if(s)r[s]=a;}return r;}
+function buildOcta(o){const r={};for(const a of(o||[])){const s=OCTA_MAP[a.agente];if(s)r[s]={total:a.total||0,inbound:a.inbound||0,outbound:a.outbound||0,tempo_medio:a.tempo_medio||0};}return r;}
 
 function initProdutividade() {
     el.section = document.getElementById("secaoProdutividade");
@@ -153,14 +153,17 @@ function renderMarcacao(marc, octaMap) {
 
     let h = `<table class="prod-table"><thead><tr>
         <th>#</th><th>Sigla</th><th>Nome</th>
-        <th>Marcacoes</th><th>Ligacoes</th><th>T.Med</th><th>WhatsApp</th><th>TOTAL</th><th></th>
+        <th>Marcacoes</th><th>Ligacoes</th><th>T.Med Lig</th><th>WhatsApp</th><th>T.Med Wpp</th><th>TOTAL</th><th></th>
     </tr></thead><tbody>`;
     let p=1;
     for(const u of lista){
+        const octaInfo = octaMap[u.usuario];
+        const tMedWpp = octaInfo && octaInfo.tempo_medio ? fmt(octaInfo.tempo_medio) : '-';
         h+=`<tr><td class="rank-cell">${p++}</td>
             <td style="font-weight:bold;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td>
             <td class="num-cell">${u.marcacoes||0}</td><td class="num-cell">${u.ligacoes||'-'}</td>
             <td class="num-cell">${fmt(u.tempo_medio_lig)}</td><td class="num-cell">${u.wpp||'-'}</td>
+            <td class="num-cell">${tMedWpp}</td>
             <td class="num-cell total-cell">${u.total}</td>
             <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')">x</button></td></tr>`;
     }
@@ -170,7 +173,7 @@ function renderMarcacao(marc, octaMap) {
     const tT=lista.reduce((s,u)=>s+u.total,0);
     h+=`<tr class="total-row"><td colspan="3" style="text-align:right;">TOTAL</td>
         <td class="num-cell">${tM}</td><td class="num-cell">${tL||'-'}</td><td></td>
-        <td class="num-cell">${tW||'-'}</td><td class="num-cell total-cell">${tT}</td><td></td></tr></tbody></table>`;
+        <td class="num-cell">${tW||'-'}</td><td></td><td class="num-cell total-cell">${tT}</td><td></td></tr></tbody></table>`;
 
     const oc=getOc();
     if(oc.length) h+=`<div style="margin-top:8px;font-size:11px;color:#96b7ff;">Ocultos: ${oc.map(s=>`<button class="btn-restaurar" onclick="toggleOc('${s}')">${s}</button>`).join(' ')}</div>`;
