@@ -312,6 +312,105 @@ function renderChartWpp(octa) {
 // ── Timeline ──────────────────────────────────────────────────────────
 
 const API_TIMELINE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/timeline";
+const ST_RAMAIS = "cavalieri_ramais_custom";
+
+// Mapa padrão (vem do backend, mas editável no frontend)
+const MAPA_PADRAO = {
+    "192.168.0.1":  {host:"205MARC01",  ramal:null,   setor:"marcacao"},
+    "192.168.0.2":  {host:"205MARC02",  ramal:"2056", setor:"marcacao"},
+    "192.168.0.3":  {host:"205MARC03",  ramal:"2057", setor:"marcacao"},
+    "192.168.0.4":  {host:"205MARC04",  ramal:"2058", setor:"marcacao"},
+    "192.168.0.5":  {host:"205MARC05",  ramal:"2055", setor:"marcacao"},
+    "192.168.0.6":  {host:"205MARC06",  ramal:"2054", setor:"marcacao"},
+    "192.168.0.7":  {host:"DAYANE",     ramal:"2053", setor:"adm"},
+    "192.168.0.8":  {host:"RENATA",     ramal:"2050", setor:"adm"},
+    "192.168.0.26": {host:"IMAG",       ramal:"2051", setor:"ti"},
+    "192.168.0.30": {host:"306RECEP01", ramal:"3061", setor:"recepcao"},
+    "192.168.0.31": {host:"306RECEP02", ramal:"3061", setor:"recepcao"},
+    "192.168.0.32": {host:"307RECEP01", ramal:"3071", setor:"recepcao"},
+    "192.168.0.33": {host:"307RECEP02", ramal:"3072", setor:"recepcao"},
+    "192.168.0.34": {host:"313RECEP01", ramal:"3131", setor:"recepcao"},
+    "192.168.0.35": {host:"602RECEP02", ramal:"6021", setor:"recepcao"},
+    "192.168.0.36": {host:"602RECEP01", ramal:"6021", setor:"recepcao"},
+    "192.168.0.37": {host:"602RECEP03", ramal:"6022", setor:"recepcao"},
+    "192.168.0.38": {host:"606RECEP01", ramal:"6061", setor:"recepcao"},
+    "192.168.0.39": {host:"606RECEP02", ramal:"6062", setor:"recepcao"},
+    "192.168.0.40": {host:"606RECEP03", ramal:"6062", setor:"recepcao"},
+    "192.168.0.41": {host:"BIOPSIA",    ramal:null,   setor:"outro"},
+};
+
+function getRamaisCustom() {
+    try { const r = localStorage.getItem(ST_RAMAIS); if (r) return JSON.parse(r); } catch(e) {}
+    return {};
+}
+
+function getMapaRamais() {
+    const custom = getRamaisCustom();
+    const mapa = {};
+    for (const ip in MAPA_PADRAO) {
+        mapa[ip] = { ...MAPA_PADRAO[ip] };
+        if (custom[ip]) mapa[ip].ramal = custom[ip];
+    }
+    return mapa;
+}
+
+function renderEditorRamais(mapaEstacoes) {
+    const div = document.getElementById("editorRamais");
+    if (!div) return;
+    const mapa = mapaEstacoes || MAPA_PADRAO;
+    const custom = getRamaisCustom();
+
+    let h = `<table class="prod-table prod-table-sm"><thead><tr>
+        <th>IP</th><th>Hostname</th><th>Setor</th><th>Ramal Padrao</th><th>Ramal Atual</th>
+    </tr></thead><tbody>`;
+
+    const ips = Object.keys(mapa).sort((a, b) => {
+        const na = a.split('.').map(Number);
+        const nb = b.split('.').map(Number);
+        return na[3] - nb[3];
+    });
+
+    for (const ip of ips) {
+        const info = mapa[ip] || {};
+        const ramalPadrao = info.ramal || '-';
+        const ramalAtual = custom[ip] || info.ramal || '';
+        const isCustom = custom[ip] && custom[ip] !== info.ramal;
+
+        h += `<tr${isCustom ? ' style="background:rgba(242,201,76,0.1);"' : ''}>
+            <td style="font-weight:bold;">${ip}</td>
+            <td>${info.host || ip}</td>
+            <td><span class="timeline-setor-tag tag-${info.setor || 'outro'}">${(info.setor || 'outro').toUpperCase()}</span></td>
+            <td class="num-cell">${ramalPadrao}</td>
+            <td><input type="text" class="ramal-input" data-ip="${ip}" value="${ramalAtual}"
+                style="width:60px;padding:4px;background:#0f1738;color:#fff;border:1px solid ${isCustom ? '#f2c94c' : '#3a86ff'};border-radius:4px;text-align:center;" /></td>
+        </tr>`;
+    }
+
+    h += `</tbody></table>`;
+    div.innerHTML = h;
+
+    // Bind salvar/reset
+    document.getElementById("btnSalvarRamais").onclick = () => {
+        const custom = {};
+        document.querySelectorAll(".ramal-input").forEach(input => {
+            const ip = input.dataset.ip;
+            const val = input.value.trim();
+            const padrao = (mapa[ip] || {}).ramal || '';
+            if (val && val !== padrao) custom[ip] = val;
+        });
+        localStorage.setItem(ST_RAMAIS, JSON.stringify(custom));
+        renderEditorRamais(mapa);
+        showSt("Ramais salvos! Recarregue os dados para aplicar.", "info");
+        setTimeout(hideSt, 3000);
+    };
+
+    document.getElementById("btnResetRamais").onclick = () => {
+        localStorage.removeItem(ST_RAMAIS);
+        renderEditorRamais(mapa);
+        showSt("Ramais resetados para padrao.", "info");
+        setTimeout(hideSt, 3000);
+    };
+}
 
 async function carregarTimeline() {
     const data = el.timelineData.value;
@@ -328,7 +427,22 @@ async function carregarTimeline() {
     }
 }
 
-function renderTimeline(timeline, nomes, mapa, data) {
+function renderTimeline(timeline, nomes, mapaBackend, data) {
+    // Aplicar ramais customizados sobre o mapa do backend
+    const custom = getRamaisCustom();
+    const mapa = {};
+    for (const ip in mapaBackend) {
+        mapa[ip] = { ...mapaBackend[ip] };
+        if (custom[ip]) mapa[ip].ramal = custom[ip];
+    }
+    // Aplicar custom nos dados da timeline
+    for (const usr in timeline) {
+        for (const s of timeline[usr]) {
+            if (custom[s.ip]) s.ramal = custom[s.ip];
+        }
+    }
+    // Renderizar editor
+    renderEditorRamais(mapaBackend);
     const usuarios = Object.keys(timeline).sort((a, b) => {
         const ha = timeline[a][0] ? timeline[a][0].hora : 'z';
         const hb = timeline[b][0] ? timeline[b][0].hora : 'z';

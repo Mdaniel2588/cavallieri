@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260407f">
+    <link rel="stylesheet" href="styles.css?v=20260407g">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260407f"></script>
-    <script defer src="app_produtividade.js?v=20260407f"></script>
+    <script defer src="app.js?v=20260407g"></script>
+    <script defer src="app_produtividade.js?v=20260407g"></script>
 </head>
 <body>
     <div class="login-overlay" id="loginOverlay">
@@ -201,6 +201,15 @@
                 <button id="btnTimelineCarregar" class="active" type="button" style="padding:6px 14px;">CARREGAR</button>
             </div>
             <div id="timelineConteudo"></div>
+
+            <!-- Editor de Mapa IP → Ramal -->
+            <details class="prod-detalhe" style="margin-top:16px;">
+                <summary style="color:#f2c94c;font-weight:bold;">Configurar Ramais por Estacao</summary>
+                <p style="color:#96b7ff;font-size:11px;margin:8px 0;">Ajuste o ramal de cada PC. Salva no navegador e sobrescreve o mapa padrao.</p>
+                <div id="editorRamais"></div>
+                <button id="btnSalvarRamais" class="active" type="button" style="margin-top:8px;padding:6px 14px;">SALVAR</button>
+                <button id="btnResetRamais" type="button" style="margin-top:8px;padding:6px 14px;background:#5c1d2b;border-color:#ff8aa1;color:#ffe3e7;">RESETAR PADRAO</button>
+            </details>
         </div>
 
         <!-- Graficos -->
