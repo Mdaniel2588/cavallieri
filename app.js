@@ -311,21 +311,8 @@ function renderPainelUsuarios() {
 
     html += `</tbody></table>`;
 
-    // Classificação de Funcionários (sigla → setor)
-    html += `<h3 style="color:#3a86ff;margin:24px 0 12px;">Classificar Funcionarios</h3>
-        <p style="color:#96b7ff;font-size:12px;margin-bottom:10px;">Define como cada sigla aparece nas tabelas de produtividade.</p>
-        <table class="prod-table" id="tabelaSetores">
-            <thead><tr>
-                <th>Sigla</th><th>Nome (Kliniki)</th><th>Cargo</th><th>Setor</th><th>Classificacao</th>
-            </tr></thead>
-            <tbody id="corpoSetores"></tbody>
-        </table>
-
     </div>`;
     secao.innerHTML = html;
-
-    // Popular tabela de setores com dados do último carregamento
-    renderTabelaSetores();
 
     // Bind adicionar
     document.getElementById("btnAdicionarUsuario").addEventListener("click", () => {
@@ -375,58 +362,6 @@ function renderPainelUsuarios() {
     });
 }
 
-function renderTabelaSetores() {
-    const corpo = document.getElementById("corpoSetores");
-    if (!corpo) return;
-
-    // Pegar mapa_usuarios do último carregamento de produtividade
-    const mapaUsuarios = (typeof prodData !== "undefined" && prodData && prodData.mapa_usuarios) ? prodData.mapa_usuarios : [];
-    const setoresConfig = typeof getSetoresConfig === "function" ? getSetoresConfig() : {};
-    const opcoes = ["", "marcacao", "recepcao", "medico", "tecnico", "ti", "adm"];
-    const labels = { "": "Auto", "marcacao": "Marcacao", "recepcao": "Recepcao", "medico": "Medico", "tecnico": "Tecnico", "ti": "TI", "adm": "ADM" };
-
-    let html = "";
-    const sorted = mapaUsuarios.slice().sort((a, b) => (a.sigla || "").localeCompare(b.sigla || ""));
-
-    for (const u of sorted) {
-        const sigla = u.sigla || "";
-        const atual = setoresConfig[sigla] || "";
-        html += `<tr>
-            <td style="font-weight:bold;">${sigla}</td>
-            <td style="text-align:left;">${u.nome || '-'}</td>
-            <td>${u.cargo || '-'}</td>
-            <td>${u.setor || '-'}</td>
-            <td><select class="setor-select" data-sigla="${sigla}" style="padding:4px;background:#0f1738;color:#fff;border:1px solid #3a86ff;border-radius:4px;">
-                ${opcoes.map(o => `<option value="${o}" ${o === atual ? "selected" : ""}>${labels[o]}</option>`).join("")}
-            </select></td>
-        </tr>`;
-    }
-
-    if (!sorted.length) {
-        html = `<tr><td colspan="5" style="color:#96b7ff;">Carregue a aba Produtividade primeiro para popular a lista.</td></tr>`;
-    }
-
-    corpo.innerHTML = html;
-
-    // Bind selects
-    document.querySelectorAll(".setor-select").forEach(sel => {
-        sel.addEventListener("change", () => {
-            const sigla = sel.dataset.sigla;
-            const valor = sel.value;
-            const setores = typeof getSetoresConfig === "function" ? getSetoresConfig() : {};
-            if (valor === "") {
-                delete setores[sigla];
-            } else {
-                setores[sigla] = valor;
-            }
-            if (typeof salvarSetores === "function") {
-                salvarSetores(setores);
-            } else {
-                window.localStorage.setItem("cavalieri_setores", JSON.stringify(setores));
-            }
-        });
-    });
-}
 
 function bindEvents() {
     if (elements.anoFiltro.dataset.bound === "1") {
