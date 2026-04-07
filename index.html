@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260407e">
+    <link rel="stylesheet" href="styles.css?v=20260407f">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260407e"></script>
-    <script defer src="app_produtividade.js?v=20260407e"></script>
+    <script defer src="app.js?v=20260407f"></script>
+    <script defer src="app_produtividade.js?v=20260407f"></script>
 </head>
 <body>
     <div class="login-overlay" id="loginOverlay">
@@ -180,10 +180,11 @@
             </div>
         </div>
 
-        <!-- Sub-tabs: Marcação / Recepção -->
+        <!-- Sub-tabs: Marcação / Recepção / Timeline -->
         <div class="prod-subtabs">
             <button id="tabMarcacao" class="prod-subtab active" type="button">MARCACAO</button>
             <button id="tabRecepcao" class="prod-subtab" type="button">RECEPCAO</button>
+            <button id="tabTimeline" class="prod-subtab" type="button">TIMELINE</button>
         </div>
 
         <!-- Painel Marcação -->
@@ -191,6 +192,16 @@
 
         <!-- Painel Recepção -->
         <div class="prod-table-wrapper" id="panelRecepcao" style="display:none;"></div>
+
+        <!-- Painel Timeline -->
+        <div class="prod-table-wrapper" id="panelTimeline" style="display:none;">
+            <div style="padding:8px 0;display:flex;gap:8px;align-items:center;">
+                <span class="filter-label">Data</span>
+                <input type="date" id="timelineData" class="login-input" style="width:160px;padding:6px 10px;" />
+                <button id="btnTimelineCarregar" class="active" type="button" style="padding:6px 14px;">CARREGAR</button>
+            </div>
+            <div id="timelineConteudo"></div>
+        </div>
 
         <!-- Graficos -->
         <div class="prod-charts">

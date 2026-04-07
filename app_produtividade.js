@@ -35,8 +35,13 @@ function initProdutividade() {
     el.btnAno = document.getElementById("btnAnoProd");
     el.tabMarc = document.getElementById("tabMarcacao");
     el.tabRecep = document.getElementById("tabRecepcao");
+    el.tabTimeline = document.getElementById("tabTimeline");
     el.panelMarc = document.getElementById("panelMarcacao");
     el.panelRecep = document.getElementById("panelRecepcao");
+    el.panelTimeline = document.getElementById("panelTimeline");
+    el.timelineData = document.getElementById("timelineData");
+    el.timelineConteudo = document.getElementById("timelineConteudo");
+    el.btnTimelineCarregar = document.getElementById("btnTimelineCarregar");
     el.cardTel = document.getElementById("cardTelefone");
     el.cardWpp = document.getElementById("cardWhatsapp");
     el.cardCon = document.getElementById("cardConsolidado");
@@ -52,6 +57,11 @@ function initProdutividade() {
 
     el.tabMarc.addEventListener("click", () => { setTab("marc"); });
     el.tabRecep.addEventListener("click", () => { setTab("recep"); });
+    el.tabTimeline.addEventListener("click", () => { setTab("timeline"); });
+
+    // Timeline
+    el.timelineData.value = new Date().toISOString().slice(0,10);
+    el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
 
     el.btnHoje.addEventListener("click", () => setPeriodo("hoje"));
     el.btnSemana.addEventListener("click", () => setPeriodo("semana"));
@@ -69,9 +79,11 @@ function setTab(tab) {
     currentTab = tab;
     el.tabMarc.classList.toggle("active", tab==="marc");
     el.tabRecep.classList.toggle("active", tab==="recep");
+    el.tabTimeline.classList.toggle("active", tab==="timeline");
     el.panelMarc.style.display = tab==="marc" ? "" : "none";
     el.panelRecep.style.display = tab==="recep" ? "" : "none";
-    // Redesenhar gráfico da aba ativa
+    el.panelTimeline.style.display = tab==="timeline" ? "" : "none";
+    if (tab === "timeline" && !el.timelineConteudo.innerHTML) carregarTimeline();
     if (prodData) renderChart();
 }
 
@@ -295,4 +307,90 @@ function renderChartWpp(octa) {
             scales:{x:{stacked:true,ticks:{color:"#aaa"},grid:{color:"rgba(255,255,255,0.1)"}},
                 y:{stacked:true,ticks:{color:"#fff",font:{size:10}},grid:{display:false}}}}
     });
+}
+
+// ── Timeline ──────────────────────────────────────────────────────────
+
+const API_TIMELINE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/timeline";
+
+async function carregarTimeline() {
+    const data = el.timelineData.value;
+    if (!data) return;
+    el.timelineConteudo.innerHTML = '<div style="color:#96b7ff;padding:10px;">Carregando timeline...</div>';
+
+    try {
+        const res = await fetch(`${API_TIMELINE}?data=${data}`);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.erro || "Erro");
+        renderTimeline(json.timeline, json.nomes, json.mapa_estacoes, data);
+    } catch (err) {
+        el.timelineConteudo.innerHTML = `<div style="color:#ffb3c1;padding:10px;">Falha: ${err.message}</div>`;
+    }
+}
+
+function renderTimeline(timeline, nomes, mapa, data) {
+    const usuarios = Object.keys(timeline).sort((a, b) => {
+        const ha = timeline[a][0] ? timeline[a][0].hora : 'z';
+        const hb = timeline[b][0] ? timeline[b][0].hora : 'z';
+        return ha.localeCompare(hb);
+    });
+
+    // Filtrar só quem logou em marcação ou recepção
+    const atendentes = usuarios.filter(usr => {
+        return timeline[usr].some(s => s.setor === 'marcacao' || s.setor === 'recepcao');
+    });
+
+    const dataBr = data.split('-').reverse().join('/');
+
+    let h = `<div style="color:#96b7ff;font-size:12px;margin-bottom:10px;">${dataBr} — ${atendentes.length} atendentes com atividade</div>`;
+
+    for (const usr of atendentes) {
+        const sessoes = timeline[usr];
+        const nome = nomes[usr] || '';
+        const primeiraHora = sessoes[0] ? sessoes[0].hora.substring(11, 16) : '';
+        const ultimaHora = sessoes[sessoes.length - 1] ? sessoes[sessoes.length - 1].hora.substring(11, 16) : '';
+
+        h += `<div class="timeline-user">`;
+        h += `<div class="timeline-header">
+            <span class="timeline-sigla">${usr}</span>
+            <span class="timeline-nome">${nome}</span>
+            <span style="color:#96b7ff;font-size:11px;">${primeiraHora} — ${ultimaHora} (${sessoes.length} sessoes)</span>
+        </div>`;
+        h += `<div class="timeline-sessoes">`;
+
+        for (let i = 0; i < sessoes.length; i++) {
+            const s = sessoes[i];
+            const hora = s.hora.substring(11, 16);
+            const horaFim = sessoes[i + 1] ? sessoes[i + 1].hora.substring(11, 16) : '...';
+            const setor = s.setor || 'outro';
+            const tagClass = 'tag-' + setor;
+
+            h += `<div class="timeline-sessao">
+                <span class="timeline-hora">${hora}</span>
+                <span style="color:#555;font-size:11px;">ate ${horaFim}</span>
+                <span class="timeline-host">${s.hostname}</span>
+                <span class="timeline-ramal">${s.ramal ? 'Ramal ' + s.ramal : '-'}</span>
+                <span class="timeline-setor-tag ${tagClass}">${setor.toUpperCase()}</span>
+            </div>`;
+        }
+
+        h += `</div></div>`;
+    }
+
+    // Outros (médicos, TI, etc)
+    const outros = usuarios.filter(usr => !atendentes.includes(usr));
+    if (outros.length) {
+        h += `<details style="margin-top:12px;"><summary style="color:#96b7ff;font-size:12px;cursor:pointer;">Outros usuarios (${outros.length})</summary>`;
+        for (const usr of outros) {
+            const sessoes = timeline[usr];
+            const nome = nomes[usr] || '';
+            h += `<div style="padding:4px 0;font-size:12px;color:#dce7ff;">
+                <b>${usr}</b> ${nome.substring(0, 25)} — `;
+            h += sessoes.map(s => `${s.hora.substring(11, 16)} ${s.hostname}`).join(' → ');
+            h += `</div>`;
+        }
+        h += `</details>`;
+    }
+
+    el.timelineConteudo.innerHTML = h;
 }

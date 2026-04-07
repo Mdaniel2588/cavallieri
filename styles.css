@@ -726,6 +726,83 @@ canvas {
 .setor-marc { color: #3a86ff; font-weight: 600; font-size: 11px; }
 .setor-recep { color: #25d366; font-weight: 600; font-size: 11px; }
 
+.timeline-user {
+    margin-bottom: 12px;
+    border: 1px solid #2f4f9c;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: #1c2541;
+    cursor: pointer;
+}
+
+.timeline-header:hover { background: #243052; }
+
+.timeline-sigla {
+    font-weight: bold;
+    color: #3a86ff;
+    font-size: 14px;
+    min-width: 50px;
+}
+
+.timeline-nome {
+    flex: 1;
+    color: #dce7ff;
+    font-size: 13px;
+    margin-left: 10px;
+}
+
+.timeline-sessoes {
+    padding: 0 14px 10px;
+    background: #141e3a;
+}
+
+.timeline-sessao {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(47, 79, 156, 0.3);
+    font-size: 12px;
+}
+
+.timeline-hora {
+    color: #f2c94c;
+    font-weight: bold;
+    min-width: 55px;
+}
+
+.timeline-host {
+    color: #4cc9f0;
+    font-weight: 600;
+    min-width: 120px;
+}
+
+.timeline-ramal {
+    color: #96b7ff;
+    min-width: 70px;
+}
+
+.timeline-setor-tag {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.tag-marcacao { background: rgba(58,134,255,0.2); color: #3a86ff; }
+.tag-recepcao { background: rgba(37,211,102,0.2); color: #25d366; }
+.tag-adm { background: rgba(242,201,76,0.2); color: #f2c94c; }
+.tag-ti { background: rgba(155,89,182,0.2); color: #9b59b6; }
+.tag-outro { background: rgba(150,183,255,0.15); color: #96b7ff; }
+
 .btn-restaurar {
     background: #1c2541;
     border: 1px solid #3a86ff;
