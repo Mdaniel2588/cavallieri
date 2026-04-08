@@ -169,20 +169,8 @@ function renderCards(marc, recep, octa) {
     const labels = {"hoje":"Hoje","semana":"Semana","mes":"Mes","ano":"Ano"};
     const label = labels[periodo] || "Mes";
 
-    const porRamal = prodData.ligacoes_por_ramal || [];
-    const atrib = porRamal.reduce((s,r)=>s+(r.atribuidas||0),0);
-    const semSessao = tLig - atrib;
-    let ramalDetail = '';
-    if (porRamal.length) {
-        ramalDetail = '<div style="margin-top:6px;font-size:10px;color:#96b7ff;text-align:left;max-height:80px;overflow-y:auto;">'
-            + porRamal.sort((a,b)=>(b.atendidas||0)-(a.atendidas||0)).map(r => {
-                const nome = r.estacao || ('Ramal '+r.ramal);
-                const flag = r.sem_sessao > 0 ? ` <span style="color:#f6ad55;">(${r.sem_sessao} s/ sessao)</span>` : '';
-                return `${nome}: <b>${r.atendidas}</b>${flag}`;
-            }).join('<br>') + '</div>';
-    }
     el.cardTel.innerHTML = tLig
-        ? `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE ${label}</div><div class="prod-card-big">${tLig}</div><div class="prod-card-label">Atendidas (${atrib} atribuidas${semSessao>0?' | <span style="color:#f6ad55;">'+semSessao+' s/ sessao</span>':''})</div>${ramalDetail}`
+        ? `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE ${label}</div><div class="prod-card-big">${tLig}</div><div class="prod-card-label">Ligacoes Atendidas</div>`
         : `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE ${label}</div><div class="prod-card-big" style="font-size:16px;color:#96b7ff;">-</div>`;
 
     const tWpp = octa.reduce((s,a)=>s+(a.total||0),0);
