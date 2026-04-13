@@ -24,28 +24,46 @@ const STORAGE_LOGIN = "cavalieri_login_ok";
 const STORAGE_LOGIN_USER = "cavalieri_login_user";
 const STORAGE_USUARIOS = "cavalieri_usuarios";
 
-const DEFAULT_USUARIOS = {
-    "DSR": { nome: "Dayane", senha: "cav2026", perfil: "usuario", acesso: ["performance", "produtividade"] },
-    "DC": { nome: "Diana", senha: "cav2026", perfil: "usuario", acesso: ["performance"] },
-    "RR": { nome: "Rafaela", senha: "cav2026", perfil: "usuario", acesso: ["performance"] },
-    "RGM": { nome: "Rosemeri", senha: "cav2026", perfil: "usuario", acesso: ["performance"] },
-    "TEL": { nome: "Telma", senha: "cav2026", perfil: "usuario", acesso: ["performance"] },
-    "VS": { nome: "Vanessa", senha: "cav2026", perfil: "usuario", acesso: ["performance"] },
-    "RAC": { nome: "Renata", senha: "cav2026", perfil: "usuario", acesso: ["performance", "produtividade"] },
-};
+const USUARIOS_API = "https://192.168.0.27:8443/api/produtividade/usuarios";
+let _usuariosCache = null;
 
 function getUsuariosCadastrados() {
+    // Retorna cache se já carregou (sync)
+    if (_usuariosCache) return _usuariosCache;
+    // Fallback: localStorage enquanto API não responde
     try {
         const raw = window.localStorage.getItem(STORAGE_USUARIOS);
-        const local = raw ? JSON.parse(raw) : {};
-        return { ...DEFAULT_USUARIOS, ...local };
+        if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return { ...DEFAULT_USUARIOS };
+    return {};
+}
+
+async function carregarUsuariosRemoto() {
+    try {
+        const r = await fetch(USUARIOS_API, { method: 'GET' });
+        const d = await r.json();
+        if (d.ok && d.usuarios) {
+            _usuariosCache = d.usuarios;
+            window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(d.usuarios));
+        }
+    } catch (e) {
+        console.log("API usuarios offline, usando localStorage");
+    }
 }
 
 function salvarUsuarios(usuarios) {
     window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
+    _usuariosCache = usuarios;
+    // Salvar no servidor também
+    fetch(USUARIOS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuarios: usuarios })
+    }).catch(function() {});
 }
+
+// Carregar do servidor ao iniciar
+carregarUsuariosRemoto();
 
 function autenticarUsuario(login, senha) {
     if (login === MASTER_USER.login && senha === MASTER_USER.senha) {
