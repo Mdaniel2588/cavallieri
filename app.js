@@ -24,13 +24,11 @@ const STORAGE_LOGIN = "cavalieri_login_ok";
 const STORAGE_LOGIN_USER = "cavalieri_login_user";
 const STORAGE_USUARIOS = "cavalieri_usuarios";
 
-const USUARIOS_API = "https://192.168.0.27:8443/api/produtividade/usuarios";
+const USUARIOS_REMOTE = "usuarios.json";
 let _usuariosCache = null;
 
 function getUsuariosCadastrados() {
-    // Retorna cache se já carregou (sync)
     if (_usuariosCache) return _usuariosCache;
-    // Fallback: localStorage enquanto API não responde
     try {
         const raw = window.localStorage.getItem(STORAGE_USUARIOS);
         if (raw) return JSON.parse(raw);
@@ -40,29 +38,22 @@ function getUsuariosCadastrados() {
 
 async function carregarUsuariosRemoto() {
     try {
-        const r = await fetch(USUARIOS_API, { method: 'GET' });
-        const d = await r.json();
-        if (d.ok && d.usuarios) {
-            _usuariosCache = d.usuarios;
-            window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(d.usuarios));
+        const r = await fetch(USUARIOS_REMOTE + '?t=' + Date.now());
+        const usuarios = await r.json();
+        if (usuarios && typeof usuarios === 'object') {
+            _usuariosCache = usuarios;
+            window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
         }
     } catch (e) {
-        console.log("API usuarios offline, usando localStorage");
+        console.log("usuarios.json nao encontrado, usando localStorage");
     }
 }
 
 function salvarUsuarios(usuarios) {
     window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
     _usuariosCache = usuarios;
-    // Salvar no servidor também
-    fetch(USUARIOS_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuarios: usuarios })
-    }).catch(function() {});
 }
 
-// Carregar do servidor ao iniciar
 carregarUsuariosRemoto();
 
 function autenticarUsuario(login, senha) {
