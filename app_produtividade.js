@@ -253,10 +253,17 @@ async function carregarProd() {
         }).catch(()=>{});
 
         // OctaDesk classificado da 27 (eficiência, enrolação)
-        fetch(`${API_OCTA_27}?periodo=${prodPeriodo}&ano=${ano}&mes=${mes}`)
-            .then(r=>r.json()).then(j3=>{
+        // Tenta HTTPS primeiro, fallback pra HTTP
+        const octaUrl = `${API_OCTA_27}?periodo=${prodPeriodo}&ano=${ano}&mes=${mes}`;
+        fetch(octaUrl).then(r=>r.json()).then(j3=>{
+            if(j3.ok&&j3.data){octaClassificado=j3.data;renderProd();}
+        }).catch(()=>{
+            // Fallback: tentar HTTP se HTTPS falhou
+            const httpUrl = octaUrl.replace('https://','http://').replace(':9443',':8080');
+            fetch(httpUrl).then(r=>r.json()).then(j3=>{
                 if(j3.ok&&j3.data){octaClassificado=j3.data;renderProd();}
-            }).catch(()=>{});
+            }).catch(()=>{console.log('API 27 indisponivel');});
+        });
     } catch(err) { showSt("Falha: "+err.message,"error"); }
 }
 
