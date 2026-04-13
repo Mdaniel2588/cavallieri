@@ -112,7 +112,6 @@ let data = [];
 let salaFiltro = "ALL";
 let periodoMeses = 1;
 let recorteAtual = "periodo";
-let customDateRange = null; // {inicio: Date, fim: Date} quando usando intervalo customizado
 let chartRight;
 let chartCapacidade;
 let carregandoDados = false;
@@ -480,8 +479,8 @@ function bindEvents() {
         return;
     }
     elements.anoFiltro.dataset.bound = "1";
-    elements.anoFiltro.addEventListener("change", () => { customDateRange = null; atualizarDados(); });
-    elements.mesFiltro.addEventListener("change", () => { customDateRange = null; atualizarDados(); });
+    elements.anoFiltro.addEventListener("change", atualizarDados);
+    elements.mesFiltro.addEventListener("change", atualizarDados);
 
     document.querySelectorAll("#grupoBotoes button").forEach((button) => {
         button.addEventListener("click", () => {
@@ -516,77 +515,6 @@ function bindEvents() {
     carregarCapacidadeSalva();
     renderConfigCapacidade();
     renderFiltrosExclusao();
-
-    // Date range picker
-    const btnAplicar = document.getElementById("btnAplicarData");
-    const btnLimpar = document.getElementById("btnLimparData");
-    const inputInicio = document.getElementById("dataInicio");
-    const inputFim = document.getElementById("dataFim");
-
-    if (btnAplicar) {
-        btnAplicar.addEventListener("click", () => {
-            const di = inputInicio.value;
-            const df = inputFim.value;
-            if (di && df) {
-                const [ai, mi, ddi] = di.split("-").map(Number);
-                const [af, mf, ddf] = df.split("-").map(Number);
-                customDateRange = {
-                    inicio: new Date(ai, mi - 1, ddi, 0, 0, 0),
-                    fim: new Date(af, mf - 1, ddf, 23, 59, 59, 999)
-                };
-                // Ajustar selects pro mês do inicio
-                elements.anoFiltro.value = String(ai);
-                elements.mesFiltro.value = String(mi);
-                atualizarDados();
-            }
-        });
-    }
-
-    if (btnLimpar) {
-        btnLimpar.addEventListener("click", () => {
-            customDateRange = null;
-            if (inputInicio) inputInicio.value = "";
-            if (inputFim) inputFim.value = "";
-            atualizarDados();
-        });
-    }
-
-    // Botões rápidos
-    document.querySelectorAll(".btn-rapido").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const tipo = btn.dataset.rapido;
-            const h = new Date();
-            let inicio, fim;
-
-            if (tipo === "hoje") {
-                inicio = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 0, 0, 0);
-                fim = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999);
-            } else if (tipo === "semana") {
-                const dia = h.getDay();
-                const seg = h.getDate() - (dia === 0 ? 6 : dia - 1);
-                inicio = new Date(h.getFullYear(), h.getMonth(), seg, 0, 0, 0);
-                fim = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999);
-            } else if (tipo === "mes") {
-                inicio = new Date(h.getFullYear(), h.getMonth(), 1, 0, 0, 0);
-                fim = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999);
-            } else if (tipo === "trimestre") {
-                inicio = new Date(h.getFullYear(), h.getMonth() - 2, 1, 0, 0, 0);
-                fim = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999);
-            }
-
-            if (inicio && fim) {
-                customDateRange = { inicio, fim };
-                if (inputInicio) inputInicio.value = inicio.toISOString().split("T")[0];
-                if (inputFim) inputFim.value = fim.toISOString().split("T")[0];
-                elements.anoFiltro.value = String(inicio.getFullYear());
-                elements.mesFiltro.value = String(inicio.getMonth() + 1);
-                // Destacar botão ativo
-                document.querySelectorAll(".btn-rapido").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-                atualizarDados();
-            }
-        });
-    });
 }
 
 function preencherMeses() {
@@ -755,24 +683,6 @@ async function carregarDados() {
 }
 
 function construirConsultas() {
-    // Se tem range customizado que cruza meses, gerar consulta por mês
-    if (customDateRange) {
-        const meses = new Map();
-        const cursor = new Date(customDateRange.inicio.getFullYear(), customDateRange.inicio.getMonth(), 1);
-        const limite = new Date(customDateRange.fim.getFullYear(), customDateRange.fim.getMonth(), 1);
-        while (cursor <= limite) {
-            const chave = `${cursor.getFullYear()}-${cursor.getMonth() + 1}`;
-            meses.set(chave, {
-                ano: String(cursor.getFullYear()),
-                mes: String(cursor.getMonth() + 1),
-                periodo_meses: "1",
-                sala: salaFiltro !== "ALL" ? salaFiltro : ""
-            });
-            cursor.setMonth(cursor.getMonth() + 1);
-        }
-        return Array.from(meses.values());
-    }
-
     if (recorteAtual !== "semana") {
         return [{
             ano: elements.anoFiltro.value,
@@ -1010,11 +920,6 @@ function render() {
 }
 
 function obterIntervaloRecorte(anoSel, mesSel) {
-    // Se tem range customizado, usa ele
-    if (customDateRange) {
-        return { inicio: customDateRange.inicio, fim: customDateRange.fim };
-    }
-
     if (recorteAtual === "semana") {
         return {
             inicio: getInicioSemanaAtual(),

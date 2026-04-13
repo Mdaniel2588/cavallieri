@@ -51,6 +51,27 @@
                 </div>
             </div>
 
+            <div class="filter-inline">
+                <span class="filter-label">Intervalo</span>
+                <div class="filter-controls" style="gap:4px;">
+                    <input type="date" id="dataInicio" style="background:#1a2a4a;color:#fff;border:1px solid #2a3a5a;border-radius:4px;padding:4px 8px;font-size:12px;">
+                    <span style="color:#555;">até</span>
+                    <input type="date" id="dataFim" style="background:#1a2a4a;color:#fff;border:1px solid #2a3a5a;border-radius:4px;padding:4px 8px;font-size:12px;">
+                    <button id="btnAplicarData" type="button" style="padding:4px 10px;font-size:11px;">APLICAR</button>
+                    <button id="btnLimparData" type="button" style="padding:4px 10px;font-size:11px;background:#333;">LIMPAR</button>
+                </div>
+            </div>
+
+            <div class="filter-inline">
+                <span class="filter-label">Rapido</span>
+                <div class="filter-controls" style="gap:4px;">
+                    <button class="btn-rapido" data-rapido="hoje" type="button" style="padding:4px 10px;font-size:11px;">HOJE</button>
+                    <button class="btn-rapido" data-rapido="semana" type="button" style="padding:4px 10px;font-size:11px;">SEMANA</button>
+                    <button class="btn-rapido" data-rapido="mes" type="button" style="padding:4px 10px;font-size:11px;">MÊS</button>
+                    <button class="btn-rapido" data-rapido="trimestre" type="button" style="padding:4px 10px;font-size:11px;">TRIMESTRE</button>
+                </div>
+            </div>
+
             <div class="filter-inline" id="grupoBotoes">
                 <span class="filter-label">Salas</span>
                 <div class="filter-controls">
