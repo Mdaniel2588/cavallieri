@@ -545,6 +545,8 @@ function _sameDay(a, b) {
     return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+let _calExpanded = false; // Calendário recolhido por padrão
+
 function _renderCalendario() {
     const el = document.getElementById("calendarPicker");
     if (!el) return;
@@ -575,14 +577,38 @@ function _renderCalendario() {
     }
 
     let html = "";
-    // Header com setas
+    // Header com setas e texto selecionado (sempre visível)
     html += '<div class="cal-header">';
     html += '<button class="cal-arrow" id="calPrev" type="button">&#9664;</button>';
-    html += '<span class="cal-month-label" id="calMonthLabel">' + nomeMes + " " + _calAno + '</span>';
+    html += '<span class="cal-month-label" id="calMonthLabel" title="Clique para expandir/recolher">' + nomeMes + " " + _calAno + '</span>';
     html += '<button class="cal-arrow" id="calNext" type="button">&#9654;</button>';
+    if (textoSel && !_calExpanded) {
+        html += '<span style="margin-left:10px;font-size:11px;color:#96b7ff;">' + textoSel + '</span>';
+    }
     html += '</div>';
 
-    // Grid
+    // Grid — só se expandido
+    if (!_calExpanded) {
+        // Recolhido: mostrar botões rápidos inline
+        html += '<div class="cal-quick" style="margin-top:4px;">';
+        const quicks = [
+            { id: "hoje", label: "HOJE" },
+            { id: "semana", label: "SEMANA" },
+            { id: "mes", label: "MES" },
+            { id: "trimestre", label: "TRIMESTRE" }
+        ];
+        for (const q of quicks) {
+            const act = _calQuickActive === q.id ? " active" : "";
+            html += '<button class="cal-qbtn' + act + '" data-quick="' + q.id + '" type="button">' + q.label + '</button>';
+        }
+        html += '</div>';
+
+        el.innerHTML = html;
+        _bindCalHeader(el, textoSel);
+        return;
+    }
+
+    // Expandido: grid completo
     html += '<div class="cal-grid">';
     const dow = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
     for (const d of dow) html += '<div class="cal-dow">' + d + '</div>';
@@ -636,30 +662,9 @@ function _renderCalendario() {
     html += '<div class="cal-selection">Selecionado: ' + (textoSel || "-") + '</div>';
 
     el.innerHTML = html;
+    _bindCalHeader(el, textoSel);
 
-    // Bind eventos
-    document.getElementById("calPrev").addEventListener("click", () => {
-        _calMes--;
-        if (_calMes < 0) { _calMes = 11; _calAno--; }
-        _renderCalendario();
-    });
-    document.getElementById("calNext").addEventListener("click", () => {
-        _calMes++;
-        if (_calMes > 11) { _calMes = 0; _calAno++; }
-        _renderCalendario();
-    });
-
-    // Clique no nome do mes = selecionar mes inteiro
-    document.getElementById("calMonthLabel").addEventListener("click", () => {
-        _calQuickActive = "";
-        _calSelA = new Date(_calAno, _calMes, 1);
-        _calSelB = new Date(_calAno, _calMes + 1, 0);
-        _aplicarSelecaoCalendario();
-        _renderCalendario();
-        atualizarDados();
-    });
-
-    // Clique nos dias
+    // Clique nos dias (só quando expandido)
     el.querySelectorAll(".cal-day:not(.outside)").forEach(cell => {
         cell.addEventListener("click", () => {
             const dia = Number(cell.dataset.dia);
@@ -667,56 +672,108 @@ function _renderCalendario() {
             _calQuickActive = "";
 
             if (!_calSelA || (_calSelA && _calSelB)) {
-                // Primeiro clique ou reset
                 _calSelA = dtClicado;
                 _calSelB = null;
+                _renderCalendario(); // Mostrar primeiro selecionado
             } else {
-                // Segundo clique = range
                 _calSelB = dtClicado;
+                _aplicarSelecaoCalendario();
+                _calExpanded = false; // Recolher ao terminar seleção
+                _renderCalendario();
+                atualizarDados();
             }
-
-            _aplicarSelecaoCalendario();
-            _renderCalendario();
-            atualizarDados();
         });
     });
 
-    // Botoes rapidos
+    // Botoes rapidos (dentro do grid expandido)
     el.querySelectorAll(".cal-qbtn").forEach(btn => {
         btn.addEventListener("click", () => {
-            const tipo = btn.dataset.quick;
-            const h = new Date();
-            _calQuickActive = tipo;
+            _handleQuickBtn(btn.dataset.quick);
+        });
+    });
+}
 
-            if (tipo === "hoje") {
-                _calSelA = new Date(h.getFullYear(), h.getMonth(), h.getDate());
-                _calSelB = null;
-                _calMes = h.getMonth();
-                _calAno = h.getFullYear();
-            } else if (tipo === "semana") {
-                const dow = h.getDay();
-                const seg = h.getDate() - (dow === 0 ? 6 : dow - 1);
-                _calSelA = new Date(h.getFullYear(), h.getMonth(), seg);
-                _calSelB = new Date(h.getFullYear(), h.getMonth(), h.getDate());
-                _calMes = h.getMonth();
-                _calAno = h.getFullYear();
-            } else if (tipo === "mes") {
-                _calSelA = new Date(h.getFullYear(), h.getMonth(), 1);
-                _calSelB = new Date(h.getFullYear(), h.getMonth() + 1, 0);
-                _calMes = h.getMonth();
-                _calAno = h.getFullYear();
-            } else if (tipo === "trimestre") {
-                _calSelA = new Date(h.getFullYear(), h.getMonth() - 2, 1);
-                _calSelB = new Date(h.getFullYear(), h.getMonth() + 1, 0);
-                _calMes = h.getMonth();
-                _calAno = h.getFullYear();
-            }
-
+function _bindCalHeader(el, textoSel) {
+    // Setas prev/next
+    const prev = document.getElementById("calPrev");
+    const next = document.getElementById("calNext");
+    if (prev) prev.addEventListener("click", () => {
+        _calMes--;
+        if (_calMes < 0) { _calMes = 11; _calAno--; }
+        // Se recolhido, seleciona mês ao navegar
+        if (!_calExpanded) {
+            _calQuickActive = "";
+            _calSelA = new Date(_calAno, _calMes, 1);
+            _calSelB = new Date(_calAno, _calMes + 1, 0);
             _aplicarSelecaoCalendario();
             _renderCalendario();
             atualizarDados();
+        } else {
+            _renderCalendario();
+        }
+    });
+    if (next) next.addEventListener("click", () => {
+        _calMes++;
+        if (_calMes > 11) { _calMes = 0; _calAno++; }
+        if (!_calExpanded) {
+            _calQuickActive = "";
+            _calSelA = new Date(_calAno, _calMes, 1);
+            _calSelB = new Date(_calAno, _calMes + 1, 0);
+            _aplicarSelecaoCalendario();
+            _renderCalendario();
+            atualizarDados();
+        } else {
+            _renderCalendario();
+        }
+    });
+
+    // Clique no nome do mês = toggle expand/collapse
+    const label = document.getElementById("calMonthLabel");
+    if (label) label.addEventListener("click", () => {
+        _calExpanded = !_calExpanded;
+        _renderCalendario();
+    });
+
+    // Botões rápidos (quando recolhido)
+    el.querySelectorAll(".cal-qbtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            _handleQuickBtn(btn.dataset.quick);
         });
     });
+}
+
+function _handleQuickBtn(tipo) {
+    const h = new Date();
+    _calQuickActive = tipo;
+
+    if (tipo === "hoje") {
+        _calSelA = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+        _calSelB = null;
+        _calMes = h.getMonth();
+        _calAno = h.getFullYear();
+    } else if (tipo === "semana") {
+        const dow = h.getDay();
+        const seg = h.getDate() - (dow === 0 ? 6 : dow - 1);
+        _calSelA = new Date(h.getFullYear(), h.getMonth(), seg);
+        _calSelB = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+        _calMes = h.getMonth();
+        _calAno = h.getFullYear();
+    } else if (tipo === "mes") {
+        _calSelA = new Date(h.getFullYear(), h.getMonth(), 1);
+        _calSelB = new Date(h.getFullYear(), h.getMonth() + 1, 0);
+        _calMes = h.getMonth();
+        _calAno = h.getFullYear();
+    } else if (tipo === "trimestre") {
+        _calSelA = new Date(h.getFullYear(), h.getMonth() - 2, 1);
+        _calSelB = new Date(h.getFullYear(), h.getMonth() + 1, 0);
+        _calMes = h.getMonth();
+        _calAno = h.getFullYear();
+    }
+
+    _calExpanded = false; // Recolher ao usar botão rápido
+    _aplicarSelecaoCalendario();
+    _renderCalendario();
+    atualizarDados();
 }
 
 function preencherMeses() {
