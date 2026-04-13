@@ -24,6 +24,11 @@ const STORAGE_LOGIN = "cavalieri_login_ok";
 const STORAGE_LOGIN_USER = "cavalieri_login_user";
 const STORAGE_USUARIOS = "cavalieri_usuarios";
 
+const GITHUB_TOKEN = ""; // Preencher com token GitHub pra salvar remoto
+const GITHUB_REPO = "mdaniel2588/cavalieri";
+const GITHUB_FILE = "usuarios.json";
+let _usuariosCarregados = false;
+
 function getUsuariosCadastrados() {
     try {
         const raw = window.localStorage.getItem(STORAGE_USUARIOS);
@@ -32,9 +37,64 @@ function getUsuariosCadastrados() {
     return {};
 }
 
+async function carregarUsuariosRemoto() {
+    try {
+        const r = await fetch(GITHUB_FILE + '?t=' + Date.now());
+        if (r.ok) {
+            const usuarios = await r.json();
+            if (usuarios && typeof usuarios === 'object') {
+                // Só sobrescreve se localStorage estiver vazio ou na primeira carga
+                const local = window.localStorage.getItem(STORAGE_USUARIOS);
+                if (!local || local === '{}') {
+                    window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
+                } else {
+                    // Merge: remoto + local (local tem prioridade)
+                    const localObj = JSON.parse(local);
+                    const merged = { ...usuarios, ...localObj };
+                    window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(merged));
+                }
+                _usuariosCarregados = true;
+            }
+        }
+    } catch (e) {}
+}
+
 function salvarUsuarios(usuarios) {
     window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
+    // Salvar no GitHub se token configurado
+    if (GITHUB_TOKEN) {
+        salvarNoGitHub(usuarios);
+    }
 }
+
+async function salvarNoGitHub(usuarios) {
+    try {
+        // Pegar SHA atual do arquivo
+        const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
+            headers: { 'Authorization': 'token ' + GITHUB_TOKEN }
+        });
+        const info = await r.json();
+        const sha = info.sha || '';
+
+        // Atualizar arquivo
+        await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': 'token ' + GITHUB_TOKEN,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: 'Atualizar usuarios',
+                content: btoa(unescape(encodeURIComponent(JSON.stringify(usuarios, null, 2)))),
+                sha: sha
+            })
+        });
+    } catch (e) {
+        console.log('Erro salvando no GitHub:', e);
+    }
+}
+
+carregarUsuariosRemoto();
 
 function autenticarUsuario(login, senha) {
     if (login === MASTER_USER.login && senha === MASTER_USER.senha) {
