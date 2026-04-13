@@ -321,28 +321,40 @@ function renderPainelUsuarios() {
 
     for (const [login, u] of lista) {
         const acessoStr = (u.acesso || ["performance"]).join(", ");
+        const temPerf = (u.acesso || []).includes("performance");
+        const temProd = (u.acesso || []).includes("produtividade");
         html += `<tr>
             <td style="font-weight:bold;">${login}</td>
             <td>${u.nome}</td>
             <td>${acessoStr}</td>
-            <td><button class="btn-remover-user" data-login="${login}" style="background:#5c1d2b;border-color:#ff8aa1;color:#ffe3e7;padding:4px 10px;font-size:11px;">Remover</button></td>
+            <td style="display:flex;gap:4px;">
+                <button class="btn-editar-user" data-login="${login}" data-nome="${u.nome}" data-perf="${temPerf}" data-prod="${temProd}" style="background:#1a3a5c;border-color:#5ca1ff;color:#c4dbff;padding:4px 10px;font-size:11px;cursor:pointer;">Editar</button>
+                <button class="btn-remover-user" data-login="${login}" style="background:#5c1d2b;border-color:#ff8aa1;color:#ffe3e7;padding:4px 10px;font-size:11px;cursor:pointer;">Remover</button>
+            </td>
         </tr>`;
     }
 
     html += `</tbody></table></div>`;
     secao.innerHTML = html;
 
-    // Bind adicionar
+    // Bind adicionar/salvar
     document.getElementById("btnAdicionarUsuario").addEventListener("click", () => {
-        const login = document.getElementById("novoLogin").value.trim();
+        const btnAdd = document.getElementById("btnAdicionarUsuario");
+        const editando = btnAdd.dataset.editando || "";
+        const login = editando || document.getElementById("novoLogin").value.trim();
         const nome = document.getElementById("novoNome").value.trim();
         const senha = document.getElementById("novoSenha").value;
         const acessoPerf = document.getElementById("acessoPerf").checked;
         const acessoProd = document.getElementById("acessoProd").checked;
         const erro = document.getElementById("erroUsuario");
 
-        if (!login || !nome || !senha) {
-            erro.textContent = "Preencha login, nome e senha.";
+        if (!login || !nome) {
+            erro.textContent = "Preencha login e nome.";
+            erro.hidden = false;
+            return;
+        }
+        if (!editando && !senha) {
+            erro.textContent = "Preencha a senha.";
             erro.hidden = false;
             return;
         }
@@ -362,15 +374,56 @@ function renderPainelUsuarios() {
         }
 
         const usuarios = getUsuariosCadastrados();
-        usuarios[login] = { nome, senha, perfil: "usuario", acesso };
+        if (editando && usuarios[login]) {
+            // Editar: manter senha se não preencheu nova
+            usuarios[login].nome = nome;
+            usuarios[login].acesso = acesso;
+            if (senha) usuarios[login].senha = senha;
+        } else {
+            usuarios[login] = { nome, senha, perfil: "usuario", acesso };
+        }
         salvarUsuarios(usuarios);
         erro.hidden = true;
+
+        // Reset form
+        btnAdd.textContent = "ADICIONAR";
+        btnAdd.dataset.editando = "";
+        document.getElementById("novoLogin").disabled = false;
+        document.getElementById("novoSenha").placeholder = "Senha";
         renderPainelUsuarios();
+    });
+
+    // Bind editar
+    document.querySelectorAll(".btn-editar-user").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const login = btn.dataset.login;
+            const nome = btn.dataset.nome;
+            const temPerf = btn.dataset.perf === "true";
+            const temProd = btn.dataset.prod === "true";
+
+            // Preencher form com dados atuais
+            document.getElementById("novoLogin").value = login;
+            document.getElementById("novoLogin").disabled = true;
+            document.getElementById("novoNome").value = nome;
+            document.getElementById("novoSenha").value = "";
+            document.getElementById("novoSenha").placeholder = "Deixe vazio pra manter";
+            document.getElementById("acessoPerf").checked = temPerf;
+            document.getElementById("acessoProd").checked = temProd;
+
+            // Mudar botão pra "SALVAR"
+            const btnAdd = document.getElementById("btnAdicionarUsuario");
+            btnAdd.textContent = "SALVAR";
+            btnAdd.dataset.editando = login;
+
+            // Scroll pro form
+            document.getElementById("formNovoUsuario").scrollIntoView({ behavior: "smooth" });
+        });
     });
 
     // Bind remover
     document.querySelectorAll(".btn-remover-user").forEach(btn => {
         btn.addEventListener("click", () => {
+            if (!confirm("Remover usuario " + btn.dataset.login + "?")) return;
             const login = btn.dataset.login;
             const usuarios = getUsuariosCadastrados();
             delete usuarios[login];
