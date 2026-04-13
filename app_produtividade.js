@@ -25,6 +25,10 @@ const isOc = s => getOc().indexOf(s)>=0;
 function toggleOc(s){const a=getOc();const i=a.indexOf(s);if(i>=0)a.splice(i,1);else a.push(s);localStorage.setItem(ST_OC,JSON.stringify(a));renderProd();}
 function buildOcta(o){const r={};for(const a of(o||[])){const s=OCTA_MAP[a.agente];if(s)r[s]={total:a.total||0,inbound:a.inbound||0,outbound:a.outbound||0,tempo_medio:a.tempo_medio||0};}return r;}
 
+// Calendário produtividade
+let _pcalMes, _pcalAno, _pcalSelA, _pcalSelB, _pcalExpanded = false, _pcalQuick = "hoje";
+const _meses = ["","Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
 function initProdutividade() {
     el.section = document.getElementById("secaoProdutividade");
     el.ano = document.getElementById("anoProd");
@@ -59,19 +63,139 @@ function initProdutividade() {
     el.tabRecep.addEventListener("click", () => { setTab("recep"); });
     el.tabTimeline.addEventListener("click", () => { setTab("timeline"); });
 
-    // Timeline
     el.timelineData.value = new Date().toISOString().slice(0,10);
     el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
 
-    el.btnHoje.addEventListener("click", () => setPeriodo("hoje"));
-    el.btnSemana.addEventListener("click", () => setPeriodo("semana"));
-    el.btnMes.addEventListener("click", () => setPeriodo("mes"));
-    el.btnAno.addEventListener("click", () => setPeriodo("ano"));
-    el.ano.addEventListener("change", () => setPeriodo("mes"));
-    el.mes.addEventListener("change", () => setPeriodo("mes"));
+    // Iniciar calendário produtividade
+    _pcalMes = h.getMonth();
+    _pcalAno = h.getFullYear();
+    _pcalSelA = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+    _pcalSelB = null;
+    _renderCalProd();
 
     // Auto-load HOJE
     setPeriodo("hoje");
+}
+
+function _fmtDP(d) { return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0"); }
+function _fmtDPFull(d) { return _fmtDP(d)+"/"+d.getFullYear(); }
+function _sameDayP(a,b) { return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+
+function _renderCalProd() {
+    const box = document.getElementById("calendarPickerProd");
+    if (!box) return;
+    const nomeMes = _meses[_pcalMes + 1];
+    const h = new Date();
+
+    let rangeIni = _pcalSelA, rangeFim = _pcalSelA;
+    if (_pcalSelA && _pcalSelB) {
+        rangeIni = _pcalSelB < _pcalSelA ? _pcalSelB : _pcalSelA;
+        rangeFim = _pcalSelB > _pcalSelA ? _pcalSelB : _pcalSelA;
+    }
+    let textoSel = "";
+    if (rangeIni && rangeFim && !_sameDayP(rangeIni, rangeFim)) {
+        textoSel = _fmtDP(rangeIni) + " - " + _fmtDPFull(rangeFim);
+    } else if (rangeIni) {
+        textoSel = _fmtDPFull(rangeIni);
+    }
+
+    let html = '<div class="cal-header">';
+    html += '<button class="cal-arrow" id="pcalPrev" type="button">&#9664;</button>';
+    html += '<span class="cal-month-label" id="pcalLabel">' + nomeMes + " " + _pcalAno + '</span>';
+    html += '<button class="cal-arrow" id="pcalNext" type="button">&#9654;</button>';
+    if (textoSel && !_pcalExpanded) html += '<span style="margin-left:10px;font-size:11px;color:#96b7ff;">' + textoSel + '</span>';
+    html += '</div>';
+
+    if (!_pcalExpanded) {
+        html += '<div class="cal-quick" style="margin-top:4px;">';
+        for (const q of [{id:"hoje",label:"HOJE"},{id:"semana",label:"SEMANA"},{id:"mes",label:"MES"},{id:"trimestre",label:"TRIMESTRE"}]) {
+            html += '<button class="cal-qbtn' + (_pcalQuick===q.id?" active":"") + '" data-quick="' + q.id + '" type="button">' + q.label + '</button>';
+        }
+        html += '</div>';
+        box.innerHTML = html;
+        _bindCalProdHeader(box);
+        return;
+    }
+
+    // Grid expandido
+    html += '<div class="cal-grid">';
+    for (const d of ["DOM","SEG","TER","QUA","QUI","SEX","SAB"]) html += '<div class="cal-dow">' + d + '</div>';
+    const p1 = new Date(_pcalAno, _pcalMes, 1);
+    const uD = new Date(_pcalAno, _pcalMes + 1, 0).getDate();
+    const iS = p1.getDay();
+    const pU = new Date(_pcalAno, _pcalMes, 0).getDate();
+    for (let i = 0; i < iS; i++) html += '<div class="cal-day outside">' + (pU-iS+1+i) + '</div>';
+    for (let d = 1; d <= uD; d++) {
+        const dt = new Date(_pcalAno, _pcalMes, d);
+        let cls = "cal-day";
+        if (d===h.getDate()&&_pcalMes===h.getMonth()&&_pcalAno===h.getFullYear()) cls += " today";
+        if (rangeIni && rangeFim && !_sameDayP(rangeIni,rangeFim)) {
+            if (_sameDayP(dt,rangeIni)||_sameDayP(dt,rangeFim)) cls += " selected";
+            else if (dt>rangeIni&&dt<rangeFim) cls += " in-range";
+        } else if (rangeIni && _sameDayP(dt,rangeIni)) cls += " selected";
+        html += '<div class="' + cls + '" data-dia="' + d + '">' + d + '</div>';
+    }
+    const cU = iS + uD; for (let i = 1; i <= (7-(cU%7))%7; i++) html += '<div class="cal-day outside">' + i + '</div>';
+    html += '</div>';
+    html += '<div class="cal-quick">';
+    for (const q of [{id:"hoje",label:"HOJE"},{id:"semana",label:"SEMANA"},{id:"mes",label:"MES"},{id:"trimestre",label:"TRIMESTRE"}]) {
+        html += '<button class="cal-qbtn' + (_pcalQuick===q.id?" active":"") + '" data-quick="' + q.id + '" type="button">' + q.label + '</button>';
+    }
+    html += '</div>';
+    if (textoSel) html += '<div class="cal-selection">Selecionado: ' + textoSel + '</div>';
+    box.innerHTML = html;
+    _bindCalProdHeader(box);
+
+    box.querySelectorAll(".cal-day:not(.outside)").forEach(cell => {
+        cell.addEventListener("click", () => {
+            const d = Number(cell.dataset.dia);
+            const dt = new Date(_pcalAno, _pcalMes, d);
+            _pcalQuick = "";
+            if (!_pcalSelA || (_pcalSelA && _pcalSelB)) { _pcalSelA = dt; _pcalSelB = null; _renderCalProd(); }
+            else { _pcalSelB = dt; _pcalExpanded = false; _applyCalProd(); _renderCalProd(); carregarProd(); }
+        });
+    });
+    box.querySelectorAll(".cal-qbtn").forEach(btn => btn.addEventListener("click", () => _handleProdQuick(btn.dataset.quick)));
+}
+
+function _bindCalProdHeader(box) {
+    const prev = document.getElementById("pcalPrev");
+    const next = document.getElementById("pcalNext");
+    const label = document.getElementById("pcalLabel");
+    if (prev) prev.addEventListener("click", () => {
+        _pcalMes--; if (_pcalMes<0){_pcalMes=11;_pcalAno--;}
+        if (!_pcalExpanded) { _pcalQuick=""; _pcalSelA=new Date(_pcalAno,_pcalMes,1); _pcalSelB=new Date(_pcalAno,_pcalMes+1,0); _applyCalProd(); carregarProd(); }
+        _renderCalProd();
+    });
+    if (next) next.addEventListener("click", () => {
+        _pcalMes++; if (_pcalMes>11){_pcalMes=0;_pcalAno++;}
+        if (!_pcalExpanded) { _pcalQuick=""; _pcalSelA=new Date(_pcalAno,_pcalMes,1); _pcalSelB=new Date(_pcalAno,_pcalMes+1,0); _applyCalProd(); carregarProd(); }
+        _renderCalProd();
+    });
+    if (label) label.addEventListener("click", () => { _pcalExpanded = !_pcalExpanded; _renderCalProd(); });
+    box.querySelectorAll(".cal-qbtn").forEach(btn => btn.addEventListener("click", () => _handleProdQuick(btn.dataset.quick)));
+}
+
+function _handleProdQuick(tipo) {
+    const h = new Date();
+    _pcalQuick = tipo;
+    if (tipo === "hoje") { _pcalSelA = new Date(h.getFullYear(),h.getMonth(),h.getDate()); _pcalSelB = null; prodPeriodo = "hoje"; }
+    else if (tipo === "semana") { const dow=h.getDay(); const seg=h.getDate()-(dow===0?6:dow-1); _pcalSelA=new Date(h.getFullYear(),h.getMonth(),seg); _pcalSelB=new Date(h.getFullYear(),h.getMonth(),h.getDate()); prodPeriodo = "semana"; }
+    else if (tipo === "mes") { _pcalSelA=new Date(h.getFullYear(),h.getMonth(),1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "mes"; }
+    else if (tipo === "trimestre") { _pcalSelA=new Date(h.getFullYear(),h.getMonth()-2,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "mes"; }
+    _pcalMes = h.getMonth(); _pcalAno = h.getFullYear();
+    _pcalExpanded = false;
+    _applyCalProd();
+    _renderCalProd();
+    setPeriodo(prodPeriodo);
+}
+
+function _applyCalProd() {
+    if (!_pcalSelA) return;
+    const ini = _pcalSelB && _pcalSelB < _pcalSelA ? _pcalSelB : _pcalSelA;
+    const fim = _pcalSelB && _pcalSelB > _pcalSelA ? _pcalSelB : (_pcalSelB || _pcalSelA);
+    el.ano.value = String(ini.getFullYear());
+    el.mes.value = String(ini.getMonth() + 1);
 }
 
 let currentTab = "marc";

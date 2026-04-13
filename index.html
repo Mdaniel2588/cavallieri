@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260408a">
+    <link rel="stylesheet" href="styles.css?v=20260413b">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260408a"></script>
-    <script defer src="app_produtividade.js?v=20260408a"></script>
+    <script defer src="app.js?v=20260413b"></script>
+    <script defer src="app_produtividade.js?v=20260413b"></script>
     <style>
     /* Calendario inline */
     .cal-wrapper{user-select:none;}
@@ -147,21 +147,16 @@
         <div class="main-title-banner" id="tituloProd">PRODUTIVIDADE</div>
         <div class="status-banner" id="statusProd" hidden></div>
 
+        <select id="anoProd" style="display:none"></select>
+        <select id="mesProd" style="display:none"></select>
+        <button id="btnHojeProd" style="display:none"></button>
+        <button id="btnSemanaProd" style="display:none"></button>
+        <button id="btnMesProd" style="display:none"></button>
+        <button id="btnAnoProd" style="display:none"></button>
+
         <div class="filters">
             <div class="filters-main">
-                <div class="filter-inline">
-                    <span class="filter-label">Periodo</span>
-                    <div class="filter-controls">
-                        <select id="anoProd"></select>
-                        <select id="mesProd"></select>
-                    </div>
-                </div>
-                <div class="filter-controls">
-                    <button id="btnHojeProd" class="active" type="button" style="background:#1faa59;border-color:#1faa59;">HOJE</button>
-                    <button id="btnSemanaProd" type="button">SEMANA</button>
-                    <button id="btnMesProd" type="button">MES</button>
-                    <button id="btnAnoProd" type="button">ANO</button>
-                </div>
+                <div class="cal-wrapper" id="calendarPickerProd"></div>
             </div>
         </div>
 
