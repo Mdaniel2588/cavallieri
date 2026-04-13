@@ -24,11 +24,7 @@ const STORAGE_LOGIN = "cavalieri_login_ok";
 const STORAGE_LOGIN_USER = "cavalieri_login_user";
 const STORAGE_USUARIOS = "cavalieri_usuarios";
 
-const USUARIOS_REMOTE = "usuarios.json";
-let _usuariosCache = null;
-
 function getUsuariosCadastrados() {
-    if (_usuariosCache) return _usuariosCache;
     try {
         const raw = window.localStorage.getItem(STORAGE_USUARIOS);
         if (raw) return JSON.parse(raw);
@@ -36,25 +32,9 @@ function getUsuariosCadastrados() {
     return {};
 }
 
-async function carregarUsuariosRemoto() {
-    try {
-        const r = await fetch(USUARIOS_REMOTE + '?t=' + Date.now());
-        const usuarios = await r.json();
-        if (usuarios && typeof usuarios === 'object') {
-            _usuariosCache = usuarios;
-            window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
-        }
-    } catch (e) {
-        console.log("usuarios.json nao encontrado, usando localStorage");
-    }
-}
-
 function salvarUsuarios(usuarios) {
     window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
-    _usuariosCache = usuarios;
 }
-
-carregarUsuariosRemoto();
 
 function autenticarUsuario(login, senha) {
     if (login === MASTER_USER.login && senha === MASTER_USER.senha) {
