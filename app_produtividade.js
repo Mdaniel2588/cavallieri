@@ -483,8 +483,10 @@ function renderMarcacao(marc, octaMap) {
         const total = t.atend_real || 1;
         const cats = [
             {label:'Pediram Marcação',val:t.marcacao,color:'#3a86ff',bg:'rgba(58,134,255,0.12)'},
+            {label:'Agendou Efetivo',val:t.agendou_efetivo,color:'#00e676',bg:'rgba(0,230,118,0.12)'},
             {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)'},
             {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)'},
+            {label:'Reclamação',val:t.reclamacao,color:'#ff5252',bg:'rgba(255,82,82,0.12)'},
             {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)'},
             {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.12)'},
             {label:'Disparo Massa',val:t.disparo,color:'#666',bg:'rgba(100,100,100,0.12)'},
