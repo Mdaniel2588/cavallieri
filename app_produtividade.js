@@ -280,7 +280,6 @@ async function carregarProd() {
     }
 
     const url = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_3cx=1${mapaParam}${dateParams}`;
-    const urlOcta = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_octa=1${dateParams}`;
 
     showSt("Carregando...", "info");
     try {
@@ -288,25 +287,26 @@ async function carregarProd() {
         const j1 = await r1.json();
         if (!j1.ok) throw new Error(j1.erro||"Erro");
         prodData = j1.data;
+        // OctaDesk: buscar da .27 (banco local, 60ms) em paralelo com Kliniki
+        // NÃO usar com_octa=1 do clinic_bridge (demora 90+ segundos)
+        const octaUrl = `${API_OCTA_27}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
+        try {
+            const r2 = await fetch(octaUrl);
+            const j2 = await r2.json();
+            if(j2.ok&&j2.data){
+                octaClassificado = j2.data;
+                // Montar octadesk[] no formato que o renderProd espera
+                prodData.octadesk = (j2.data.agentes||[]).map(a => ({
+                    agente: a.agent_name,
+                    total: a.atend_real||0,
+                    inbound: 0, outbound: 0, tempo_medio: 0
+                }));
+            }
+        } catch(e) { console.warn("API .27:", e); }
+
         renderProd();
         hideSt();
         if(prodPeriodo==="hoje"){showSt("Realtime — atualiza a cada 2 min","info");setTimeout(hideSt,4000);}
-
-        // OctaDesk via clinic_bridge (background)
-        fetch(urlOcta).then(r=>r.json()).then(j2=>{
-            if(j2.ok&&j2.data&&j2.data.octadesk){prodData.octadesk=j2.data.octadesk;renderProd();}
-        }).catch(()=>{});
-
-        // OctaDesk classificado da .27
-        const octaUrl = `${API_OCTA_27}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
-        fetch(octaUrl).then(r=>r.json()).then(j3=>{
-            if(j3.ok&&j3.data){octaClassificado=j3.data;renderProd();}
-        }).catch(()=>{
-            const httpUrl = octaUrl.replace('https://','http://').replace(':8443',':8080');
-            fetch(httpUrl).then(r=>r.json()).then(j3=>{
-                if(j3.ok&&j3.data){octaClassificado=j3.data;renderProd();}
-            }).catch(()=>{});
-        });
     } catch(err) { showSt("Falha: "+err.message,"error"); }
 }
 
