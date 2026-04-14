@@ -386,8 +386,7 @@ function renderCards(marc, recep, octa) {
         <div class="prod-card-big">${tAtend || '-'}</div>
         <div class="prod-card-label">${label}</div>
         <div class="prod-card-sub">
-            ${tMa} marcações | ${tAd} admissões
-            ${convRate ? ` | ${convRate}% conversão WhatsApp` : ''}
+            ${tMa} agendamentos | ${tAd} admissões
         </div>`;
 }
 
@@ -434,7 +433,7 @@ function renderMarcacao(marc, octaMap) {
         ${th('WPP','wpp','WhatsApp total')}
         <th>T.Med</th>
         ${th('ATEND','atendimentos','Total atendimentos (Lig+WPP)')}
-        ${th('Marc.','marcacoes','Marcações Kliniki')}
+        ${th('Agend.','marcacoes','Agendamentos criados no Kliniki')}
         ${th('Efic.','_mediaInter','Media interações/chat (menor = mais objetiva)')}
         ${th('Enrol.','_pctLongos','% chats com mais de 10 interações')}
         ${th('Conv.','_taxaEf','Taxa conversão marcações/atendimentos')}
@@ -477,29 +476,30 @@ function renderMarcacao(marc, octaMap) {
         <td class="num-cell" style="color:#f2c94c;">${tM}</td>
         <td colspan="4"></td></tr></tbody></table>`;
 
-    // Classificação OctaDesk breakdown (cards visuais)
+    // Classificação WhatsApp (da .27) — separado visualmente
     if (octaClassificado && octaClassificado.totais) {
         const t = octaClassificado.totais;
         const total = t.atend_real || 1;
         const cats = [
-            {label:'Marcação',val:t.marcacao,color:'#3a86ff',bg:'rgba(58,134,255,0.12)'},
-            {label:'Confirmação',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)'},
-            {label:'Cancelamento',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)'},
-            {label:'Informação',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)'},
-            {label:'Resultado',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.12)'},
-            {label:'Disparo',val:t.disparo,color:'#666',bg:'rgba(100,100,100,0.12)'},
+            {label:'Pediram Marcação',val:t.marcacao,color:'#3a86ff',bg:'rgba(58,134,255,0.12)'},
+            {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)'},
+            {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)'},
+            {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)'},
+            {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.12)'},
+            {label:'Disparo Massa',val:t.disparo,color:'#666',bg:'rgba(100,100,100,0.12)'},
         ];
-        h += `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">`;
+        h += `<div style="margin-top:18px;"><div style="font-size:12px;font-weight:700;color:#96b7ff;letter-spacing:.08em;margin-bottom:8px;">WHATSAPP — CLASSIFICAÇÃO (${total} conversas)</div>`;
+        h += `<div style="display:flex;gap:10px;flex-wrap:wrap;">`;
         for (const c of cats) {
             if (!c.val) continue;
             const pct = ((c.val||0)/total*100).toFixed(0);
             h += `<div style="background:${c.bg};border-radius:10px;padding:12px 16px;border-left:3px solid ${c.color};min-width:110px;flex:1;">
                 <div style="font-size:11px;color:${c.color};font-weight:700;letter-spacing:.05em;">${c.label.toUpperCase()}</div>
                 <div style="font-size:26px;font-weight:800;color:#fff;margin:2px 0;">${c.val}</div>
-                <div style="font-size:11px;color:#666;">${pct}%</div>
+                <div style="font-size:11px;color:#666;">${pct}% das conversas</div>
             </div>`;
         }
-        h += `</div>`;
+        h += `</div></div>`;
     }
 
     // Legenda
