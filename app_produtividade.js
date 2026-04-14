@@ -1,7 +1,8 @@
 /* ─── Produtividade — Clinica Cavallieri v3 ──────────────────────────── */
 
-const API_PROD = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/resumo";
-const API_OCTA_27 = "https://maicon.mdppconnect.com.br:8443/api/octa/produtividade";
+const API_BASE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade";
+const API_PROD = API_BASE + "/resumo";
+const API_WHATSAPP = "https://maicon.mdppconnect.com.br:8443/api/octa/produtividade";
 
 const OCTA_MAP = {
     "Claudio Maximiano":"CMGJ","Julia Chaves":"JSC","Maria D Sousa":"MDS",
@@ -289,7 +290,7 @@ async function carregarProd() {
         prodData = j1.data;
         // OctaDesk: buscar da .27 (banco local, 60ms) em paralelo com Kliniki
         // NÃO usar com_octa=1 do clinic_bridge (demora 90+ segundos)
-        const octaUrl = `${API_OCTA_27}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
+        const octaUrl = `${API_WHATSAPP}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
         try {
             const r2 = await fetch(octaUrl);
             const j2 = await r2.json();
@@ -614,7 +615,7 @@ function renderChartWpp(octa) {
 
 // ── Timeline ──
 
-const API_TIMELINE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/timeline";
+const API_TIMELINE = API_BASE + "/timeline";
 const ST_RAMAIS = "cavalieri_ramais_custom";
 
 const MAPA_PADRAO = {
