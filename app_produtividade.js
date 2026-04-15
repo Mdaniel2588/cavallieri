@@ -380,25 +380,28 @@ function renderMarcacao(marc, octaMap) {
         <td class="num-cell total-cell" style="font-size:14px;">${tAtend}</td>
         <td class="num-cell" style="color:#f2c94c;">${tM}</td><td colspan="4"></td></tr></tbody></table>`;
 
-    // Classificação WhatsApp + drill-down
-    if (octaClassificado?.totais) {
-        const t = octaClassificado.totais, total = t.atend_real || 1;
-        const agEf = t.agendou_efetivo || 0;
-        const agEfPct = total > 0 ? (agEf/total*100).toFixed(1) : '0';
+    // Cards de classificação — canal real + WhatsApp
+    if (octaClassificado?.totais || cTotal > 0) {
+        const t = octaClassificado?.totais || {};
+        const total = t.atend_real || 1;
         const cats = [
-            {label:'Agendou Efetivo',val:agEf,color:'#00e676',bg:'rgba(0,230,118,0.12)',key:'agendou'},
-            {label:'Pediram Marcação',val:t.marcacao,color:'#3a86ff',bg:'rgba(58,134,255,0.12)',key:'marcacao'},
-            {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)',key:'confirmacao'},
+            {label:'Agendaram via WhatsApp',val:cWpp,color:'#25d366',bg:'rgba(37,211,102,0.12)',key:'marcacao'},
+            {label:'Agendaram via Telefone',val:cTel+cHib,color:'#3a86ff',bg:'rgba(58,134,255,0.12)',key:null},
+            {label:'Agendado Direto',val:cDir,color:'#9b59b6',bg:'rgba(155,89,182,0.12)',key:null},
+            {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)',key:null},
             {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)',key:'cancelamento'},
             {label:'Reclamação',val:t.reclamacao,color:'#ff5252',bg:'rgba(255,82,82,0.12)',key:'reclamacao'},
-            {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)',key:'informacao'},
-            {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.12)',key:'resultado'},
+            {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)',key:null},
+            {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.08)',key:'resultado'},
         ];
-        h += `<div style="margin-top:18px;"><div style="font-size:12px;font-weight:700;color:#96b7ff;letter-spacing:.08em;margin-bottom:8px;">WHATSAPP — CLASSIFICAÇÃO (${total} conversas)</div>`;
+        const totalAgend = cTotal || tMa || 1;
+        h += `<div style="margin-top:18px;"><div style="font-size:12px;font-weight:700;color:#96b7ff;letter-spacing:.08em;margin-bottom:8px;">AGENDAMENTOS POR CANAL + WHATSAPP (${tMa} agendamentos | ${total} conversas)</div>`;
         h += `<div style="display:flex;gap:10px;flex-wrap:wrap;">`;
         for (const c of cats) {
             if (!c.val) continue;
-            const pct = ((c.val||0)/total*100).toFixed(0);
+            // Canal usa cTotal como base, WhatsApp usa total conversas
+            const base = c.key === 'marcacao' || !c.key ? totalAgend : total;
+            const pct = ((c.val||0)/base*100).toFixed(0);
             const hasDetail = octaClassificado?.detalhes?.[c.key];
             const cursor = hasDetail ? 'cursor:pointer;' : '';
             const click = hasDetail ? ` onclick="toggleDetalhe('${c.key}')"` : '';
