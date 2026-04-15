@@ -1,8 +1,7 @@
-/* ─── Produtividade — Clinica Cavallieri v3 ──────────────────────────── */
+/* ─── Produtividade — Clinica Cavallieri ─────────────────────────────── */
 
-const API_BASE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade";
-const API_PROD = API_BASE + "/resumo";
-const API_WHATSAPP = API_BASE + "/whatsapp";
+const API_PROD = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/resumo";
+const API_OCTA_27 = "https://maicon.mdppconnect.com.br:8443/api/octa/produtividade";
 
 const OCTA_MAP = {
     "Claudio Maximiano":"CMGJ","Julia Chaves":"JSC","Maria D Sousa":"MDS",
@@ -12,9 +11,6 @@ const OCTA_MAP = {
     "Cristialine Silva":"CJS","Renata Aquino":"RAC","Dayane":"DSR"
 };
 
-// Siglas que NÃO são atendentes (médicos, admin) — excluir do ranking
-const EXCLUIR_RANKING = ["FPK","PRQ","MDM","MD"];
-
 const ST_OC = "cavalieri_ocultos";
 let prodData = null;
 let prodPeriodo = "hoje";
@@ -22,23 +18,24 @@ let prodTimer = null;
 let chartMarc = null;
 let chartRecep = null;
 let chartWpp = null;
-let octaClassificado = null;
+let octaClassificado = null; // dados classificados da 27
 let _sortCol = 'atendimentos';
-let _sortDir = -1;
+let _sortDir = -1; // -1 = desc
 const el = {};
 
+// Mapa reverso: sigla → nome OctaDesk
 const OCTA_MAP_REV = {};
 for (const [nome, sigla] of Object.entries(OCTA_MAP)) OCTA_MAP_REV[sigla] = nome;
 
-// Sort
+// Sort handler
 function sortBy(col) {
     if (_sortCol === col) _sortDir *= -1;
     else { _sortCol = col; _sortDir = -1; }
     renderProd();
 }
 function sortArrow(col) {
-    if (_sortCol !== col) return ' <span style="opacity:0.4;font-size:11px;">&#9650;&#9660;</span>';
-    return _sortDir < 0 ? ' <span style="color:#4cc9f0;">&#9660;</span>' : ' <span style="color:#4cc9f0;">&#9650;</span>';
+    if (_sortCol !== col) return ' <span style="opacity:0.3;font-size:10px;">&#9650;&#9660;</span>';
+    return _sortDir < 0 ? ' <span style="color:#3a86ff;">&#9660;</span>' : ' <span style="color:#3a86ff;">&#9650;</span>';
 }
 
 const fmt = s => { if(!s) return '-'; const m=Math.floor(s/60),r=s%60; return m>0?`${m}m${String(r).padStart(2,'0')}s`:`${r}s`; };
@@ -47,9 +44,9 @@ const isOc = s => getOc().indexOf(s)>=0;
 function toggleOc(s){const a=getOc();const i=a.indexOf(s);if(i>=0)a.splice(i,1);else a.push(s);localStorage.setItem(ST_OC,JSON.stringify(a));renderProd();}
 function buildOcta(o){const r={};for(const a of(o||[])){const s=OCTA_MAP[a.agente];if(s)r[s]={total:a.total||0,inbound:a.inbound||0,outbound:a.outbound||0,tempo_medio:a.tempo_medio||0};}return r;}
 
-// Calendario produtividade
+// Calendário produtividade
 let _pcalMes, _pcalAno, _pcalSelA, _pcalSelB, _pcalExpanded = false, _pcalQuick = "hoje";
-const _meses = ["","Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const _meses = ["","Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
 function initProdutividade() {
     el.section = document.getElementById("secaoProdutividade");
@@ -88,22 +85,21 @@ function initProdutividade() {
     el.timelineData.value = new Date().toISOString().slice(0,10);
     el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
 
+    // Iniciar calendário produtividade
     _pcalMes = h.getMonth();
     _pcalAno = h.getFullYear();
     _pcalSelA = new Date(h.getFullYear(), h.getMonth(), h.getDate());
     _pcalSelB = null;
     _renderCalProd();
 
+    // Auto-load HOJE
     setPeriodo("hoje");
 }
 
-// ── Helpers de data ──
 function _fmtDP(d) { return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0"); }
 function _fmtDPFull(d) { return _fmtDP(d)+"/"+d.getFullYear(); }
 function _sameDayP(a,b) { return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
-function _toISO(d) { return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
-// ── Calendario ──
 function _renderCalProd() {
     const box = document.getElementById("calendarPickerProd");
     if (!box) return;
@@ -117,7 +113,7 @@ function _renderCalProd() {
     }
     let textoSel = "";
     if (rangeIni && rangeFim && !_sameDayP(rangeIni, rangeFim)) {
-        textoSel = _fmtDP(rangeIni) + " — " + _fmtDPFull(rangeFim);
+        textoSel = _fmtDP(rangeIni) + " - " + _fmtDPFull(rangeFim);
     } else if (rangeIni) {
         textoSel = _fmtDPFull(rangeIni);
     }
@@ -126,7 +122,7 @@ function _renderCalProd() {
     html += '<button class="cal-arrow" id="pcalPrev" type="button">&#9664;</button>';
     html += '<span class="cal-month-label" id="pcalLabel">' + nomeMes + " " + _pcalAno + '</span>';
     html += '<button class="cal-arrow" id="pcalNext" type="button">&#9654;</button>';
-    if (textoSel && !_pcalExpanded) html += '<span style="margin-left:10px;font-size:11px;color:#96b7ff;font-weight:600;">' + textoSel + '</span>';
+    if (textoSel && !_pcalExpanded) html += '<span style="margin-left:10px;font-size:11px;color:#96b7ff;">' + textoSel + '</span>';
     html += '</div>';
 
     if (!_pcalExpanded) {
@@ -202,29 +198,15 @@ function _bindCalProdHeader(box) {
 function _handleProdQuick(tipo) {
     const h = new Date();
     _pcalQuick = tipo;
-    if (tipo === "hoje") {
-        _pcalSelA = new Date(h.getFullYear(),h.getMonth(),h.getDate());
-        _pcalSelB = null;
-        prodPeriodo = "hoje";
-    } else if (tipo === "semana") {
-        const dow=h.getDay(); const seg=h.getDate()-(dow===0?6:dow-1);
-        _pcalSelA=new Date(h.getFullYear(),h.getMonth(),seg);
-        _pcalSelB=new Date(h.getFullYear(),h.getMonth(),h.getDate());
-        prodPeriodo = "semana";
-    } else if (tipo === "mes") {
-        _pcalSelA=new Date(h.getFullYear(),h.getMonth(),1);
-        _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0);
-        prodPeriodo = "mes";
-    } else if (tipo === "trimestre") {
-        _pcalSelA=new Date(h.getFullYear(),h.getMonth()-2,1);
-        _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0);
-        prodPeriodo = "trimestre";
-    }
+    if (tipo === "hoje") { _pcalSelA = new Date(h.getFullYear(),h.getMonth(),h.getDate()); _pcalSelB = null; prodPeriodo = "hoje"; }
+    else if (tipo === "semana") { const dow=h.getDay(); const seg=h.getDate()-(dow===0?6:dow-1); _pcalSelA=new Date(h.getFullYear(),h.getMonth(),seg); _pcalSelB=new Date(h.getFullYear(),h.getMonth(),h.getDate()); prodPeriodo = "semana"; }
+    else if (tipo === "mes") { _pcalSelA=new Date(h.getFullYear(),h.getMonth(),1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "mes"; }
+    else if (tipo === "trimestre") { _pcalSelA=new Date(h.getFullYear(),h.getMonth()-2,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "mes"; }
     _pcalMes = h.getMonth(); _pcalAno = h.getFullYear();
     _pcalExpanded = false;
     _applyCalProd();
     _renderCalProd();
-    carregarProd();
+    setPeriodo(prodPeriodo);
 }
 
 function _applyCalProd() {
@@ -233,17 +215,6 @@ function _applyCalProd() {
     const fim = _pcalSelB && _pcalSelB > _pcalSelA ? _pcalSelB : (_pcalSelB || _pcalSelA);
     el.ano.value = String(ini.getFullYear());
     el.mes.value = String(ini.getMonth() + 1);
-}
-
-// ── Datas do periodo selecionado ──
-function _getDateRange() {
-    if (!_pcalSelA) {
-        const h = new Date();
-        return { ini: _toISO(h), fim: _toISO(h) };
-    }
-    const ini = _pcalSelB && _pcalSelB < _pcalSelA ? _pcalSelB : _pcalSelA;
-    const fim = _pcalSelB && _pcalSelB > _pcalSelA ? _pcalSelB : (_pcalSelB || _pcalSelA);
-    return { ini: _toISO(ini), fim: _toISO(fim) };
 }
 
 let currentTab = "marc";
@@ -262,54 +233,50 @@ function setTab(tab) {
 function setPeriodo(p) {
     prodPeriodo = p;
     if(prodTimer){clearInterval(prodTimer);prodTimer=null;}
+    el.btnHoje.classList.toggle("active", p==="hoje");
+    el.btnSemana.classList.toggle("active", p==="semana");
+    el.btnMes.classList.toggle("active", p==="mes");
+    el.btnAno.classList.toggle("active", p==="ano");
     carregarProd();
     if (p === "hoje") prodTimer = setInterval(carregarProd, 120000);
 }
 
 async function carregarProd() {
     const ano=el.ano.value, mes=el.mes.value;
-    const range = _getDateRange();
+    // Montar mapa customizado como query param
     const custom = getRamaisCustom();
     const mapaParam = Object.keys(custom).length ? '&mapa=' + encodeURIComponent(JSON.stringify(custom)) : '';
-
-    // Determinar periodo para as APIs
-    let periodoParam = prodPeriodo;
-    let dateParams = '';
-    // Quick buttons: hoje, semana, mes → backend entende direto
-    // Trimestre e range manual → passar datas explícitas
-    if (prodPeriodo === "trimestre" || (prodPeriodo === "custom") || (_pcalSelA && _pcalSelB && !_pcalQuick)) {
-        periodoParam = "custom";
-        dateParams = `&data_inicio=${range.ini}&data_fim=${range.fim}`;
-    }
-
-    const url = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_3cx=1${mapaParam}${dateParams}`;
+    const url = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${prodPeriodo}&com_3cx=1${mapaParam}`;
+    const urlOcta = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${prodPeriodo}&com_octa=1`;
 
     showSt("Carregando...", "info");
     try {
+        // Kliniki+3CX primeiro (rápido)
         const r1 = await fetch(url);
         const j1 = await r1.json();
         if (!j1.ok) throw new Error(j1.erro||"Erro");
         prodData = j1.data;
-        // OctaDesk: buscar da .27 (banco local, 60ms) em paralelo com Kliniki
-        // NÃO usar com_octa=1 do clinic_bridge (demora 90+ segundos)
-        const octaUrl = `${API_WHATSAPP}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
-        try {
-            const r2 = await fetch(octaUrl);
-            const j2 = await r2.json();
-            if(j2.ok&&j2.data){
-                octaClassificado = j2.data;
-                // Montar octadesk[] no formato que o renderProd espera
-                prodData.octadesk = (j2.data.agentes||[]).map(a => ({
-                    agente: a.agent_name,
-                    total: a.atend_real||0,
-                    inbound: 0, outbound: 0, tempo_medio: 0
-                }));
-            }
-        } catch(e) { console.warn("API .27:", e); }
-
         renderProd();
         hideSt();
-        if(prodPeriodo==="hoje"){showSt("Realtime — atualiza a cada 2 min","info");setTimeout(hideSt,4000);}
+        if(prodPeriodo==="hoje"){showSt("HOJE realtime — atualiza a cada 2 min","info");setTimeout(hideSt,3000);}
+
+        // OctaDesk em background (não bloqueia)
+        fetch(urlOcta).then(r=>r.json()).then(j2=>{
+            if(j2.ok&&j2.data&&j2.data.octadesk){prodData.octadesk=j2.data.octadesk;renderProd();}
+        }).catch(()=>{});
+
+        // OctaDesk classificado da 27 (eficiência, enrolação)
+        // Tenta HTTPS primeiro, fallback pra HTTP
+        const octaUrl = `${API_OCTA_27}?periodo=${prodPeriodo}&ano=${ano}&mes=${mes}`;
+        fetch(octaUrl).then(r=>r.json()).then(j3=>{
+            if(j3.ok&&j3.data){octaClassificado=j3.data;renderProd();}
+        }).catch(()=>{
+            // Fallback: tentar HTTP se HTTPS falhou
+            const httpUrl = octaUrl.replace('https://','http://').replace(':9443',':8080');
+            fetch(httpUrl).then(r=>r.json()).then(j3=>{
+                if(j3.ok&&j3.data){octaClassificado=j3.data;renderProd();}
+            }).catch(()=>{console.log('API 27 indisponivel');});
+        });
     } catch(err) { showSt("Falha: "+err.message,"error"); }
 }
 
@@ -334,72 +301,71 @@ function renderProd() {
 function renderTitulo() {
     const titulo = document.getElementById("tituloProd");
     if (!titulo || !prodData) return;
-    const range = _getDateRange();
+    const meses = ["","Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const p = prodData.periodo || prodPeriodo;
+    const ano = prodData.ano;
+    const mes = prodData.mes;
     let txt = "PRODUTIVIDADE";
-
-    if (prodPeriodo === "hoje") {
+    if (p === "hoje") {
         const h = new Date();
-        txt = `PRODUTIVIDADE | HOJE ${String(h.getDate()).padStart(2,'0')}/${String(h.getMonth()+1).padStart(2,'0')}/${h.getFullYear()}`;
-    } else if (_pcalQuick === "semana") {
+        txt = `PRODUTIVIDADE | HOJE ${String(h.getDate()).padStart(2,'0')}/${String(h.getMonth()+1).padStart(2,'0')}/${h.getFullYear()} (REALTIME)`;
+    } else if (p === "semana") {
         txt = `PRODUTIVIDADE | SEMANA CORRENTE`;
-    } else if (_pcalQuick === "trimestre") {
-        txt = `PRODUTIVIDADE | TRIMESTRE`;
-    } else if (prodPeriodo === "mes") {
-        const m = prodData.mes || (new Date().getMonth()+1);
-        txt = `PRODUTIVIDADE | ${_meses[m] || ''} ${prodData.ano || new Date().getFullYear()}`;
-    } else {
-        // Custom range
-        const ini = range.ini.split('-').reverse().join('/');
-        const fim = range.fim.split('-').reverse().join('/');
-        txt = ini === fim ? `PRODUTIVIDADE | ${ini}` : `PRODUTIVIDADE | ${ini} a ${fim}`;
+    } else if (p === "mes") {
+        txt = `PRODUTIVIDADE | ${meses[mes] || ''} ${ano}`;
+    } else if (p === "ano") {
+        txt = `PRODUTIVIDADE | ANO ${ano}`;
     }
     titulo.textContent = txt;
 }
 
 function renderCards(marc, recep, octa) {
     const tLig = prodData.ligacoes_total || 0;
-    const range = _getDateRange();
-    const labelMap = {"hoje":"Hoje","semana":"Semana","mes":_meses[(prodData.mes||1)],"trimestre":"Trimestre","custom":"Periodo"};
-    const label = labelMap[_pcalQuick] || labelMap[prodPeriodo] || "Periodo";
+    const periodo = prodData.periodo || prodPeriodo;
+    const labels = {"hoje":"Hoje","semana":"Semana","mes":"Mes","ano":"Ano"};
+    const label = labels[periodo] || "Mes";
 
-    // Telefone
-    const tLigAt = prodData.ligacoes_atendidas || tLig;
-    el.cardTel.innerHTML = `<div class="prod-card-title">TELEFONE</div>
-        <div class="prod-card-big">${tLig || '-'}</div>
-        <div class="prod-card-label">${label}</div>
-        ${tLig ? `<div class="prod-card-sub">${tLigAt} atendidas</div>` : ''}`;
-
-    // WhatsApp
     const tWpp = octa.reduce((s,a)=>s+(a.total||0),0);
-    const tMarcOcta = octaClassificado?.totais?.marcacao || 0;
-    const tConfOcta = octaClassificado?.totais?.confirmacao || 0;
-    el.cardWpp.innerHTML = `<div class="prod-card-title">WHATSAPP</div>
-        <div class="prod-card-big">${tWpp || '-'}</div>
-        <div class="prod-card-label">${label}</div>
-        ${tWpp ? `<div class="prod-card-sub">${tMarcOcta} marcações | ${tConfOcta} confirmações</div>` : ''}`;
 
-    // Consolidado
-    const tMa = marc.filter(u=>!EXCLUIR_RANKING.includes(u.usuario)).reduce((s,u)=>s+(u.marcacoes||0),0);
+    const tMa = marc.reduce((s,u)=>s+(u.marcacoes||0),0);
     const tAd = recep.reduce((s,u)=>s+(u.admissoes||0),0);
     const tAtend = tLig + tWpp;
-    const convRate = octaClassificado?.totais?.marcacao && tMa > 0
-        ? ((octaClassificado.totais.marcacao / tMa) * 100).toFixed(0)
-        : null;
-    const pv = prodData.pacientes_primeira_vez || 0;
-    const pvPct = tAd > 0 && pv > 0 ? ` (${(pv/tAd*100).toFixed(0)}%)` : '';
-    el.cardCon.innerHTML = `<div class="prod-card-title">CONSOLIDADO</div>
-        <div class="prod-card-big">${tAtend || '-'}</div>
-        <div class="prod-card-label">${label}</div>
-        <div class="prod-card-sub">
-            ${tMa} agendamentos | ${tAd} admissões
-            ${pv ? ` | <span style="color:#00e676;">${pv} novos${pvPct}</span>` : ''}
+
+    // Separar WhatsApp por classificação (dados da 27)
+    let wppMarc=0, wppConf=0, wppDisparo=0, wppInfo=0, wppReal=0;
+    if (octaClassificado && octaClassificado.totais) {
+        const ot = octaClassificado.totais;
+        wppMarc = ot.marcacao||0;
+        wppConf = ot.confirmacao||0;
+        wppDisparo = ot.disparo||0;
+        wppInfo = ot.informacao||0;
+        wppReal = ot.atend_real||0;
+    }
+
+    el.cardTel.innerHTML = tLig
+        ? `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE ${label}</div><div class="prod-card-big">${tLig}</div><div class="prod-card-label">Ligacoes Atendidas</div>`
+        : `<div class="prod-card-icon">&#128222;</div><div class="prod-card-title">TELEFONE ${label}</div><div class="prod-card-big" style="font-size:16px;color:#96b7ff;">-</div>`;
+
+    el.cardWpp.innerHTML = `<div class="prod-card-icon">&#128172;</div><div class="prod-card-title">WHATSAPP ${label}</div>
+        <div class="prod-card-big">${wppReal||tWpp}</div><div class="prod-card-label">Atendimentos reais</div>
+        <div class="prod-card-sub" style="font-size:11px;line-height:1.6;">
+            ${wppMarc?'<span style="color:#e94560;">&#9679;</span> '+wppMarc+' marcacoes ':''}
+            ${wppConf?'<span style="color:#2ecc71;">&#9679;</span> '+wppConf+' confirmacoes ':''}
+            ${wppInfo?'<span style="color:#f39c12;">&#9679;</span> '+wppInfo+' informacao ':''}
+            ${wppDisparo?'<br><span style="color:#888;">&#9679;</span> '+wppDisparo+' disparos (massa)':''}
+        </div>`;
+
+    el.cardCon.innerHTML = `<div class="prod-card-icon">&#128200;</div><div class="prod-card-title">CONSOLIDADO ${label}</div>
+        <div class="prod-card-big">${tAtend}</div><div class="prod-card-label">Atendimentos</div>
+        <div class="prod-card-sub" style="font-size:11px;line-height:1.6;">
+            Marcacoes Kliniki: <b>${tMa}</b> | Admissoes: <b>${tAd}</b>
+            ${tLig && wppMarc ? '<br>Canal: ~'+Math.round(wppMarc/(wppMarc+(tLig*0.3)||1)*100)+'% WhatsApp | ~'+Math.round((tLig*0.3)/(wppMarc+(tLig*0.3)||1)*100)+'% Telefone':''}
         </div>`;
 }
 
 function renderMarcacao(marc, octaMap) {
     if (!el.panelMarc) return;
-    const lista = marc
-        .filter(u => !isOc(u.usuario) && !EXCLUIR_RANKING.includes(u.usuario) && ((u.marcacoes||0)+(u.ligacoes||0)>0))
+    const lista = marc.filter(u => !isOc(u.usuario) && ((u.marcacoes||0)+(u.ligacoes||0)>0))
         .map(u => {
             const wpp = (octaMap[u.usuario]||{}).total||0;
             const atendimentos = (u.ligacoes||0)+wpp;
@@ -407,7 +373,7 @@ function renderMarcacao(marc, octaMap) {
             return {...u, wpp, atendimentos, total};
         });
 
-    // Enriquecer com dados de eficiencia da .27
+    // Buscar métricas de eficiência da 27 e merge
     const efMap = {};
     if (octaClassificado && octaClassificado.agentes) {
         for (const a of octaClassificado.agentes) {
@@ -415,18 +381,23 @@ function renderMarcacao(marc, octaMap) {
             if (sigla) efMap[sigla] = a;
         }
     }
+    // Enriquecer lista com dados de eficiência
     for (const u of lista) {
         const ef = efMap[u.usuario] || {};
         u._mediaInter = ef.media_interacoes || 0;
         u._pctLongos = ef.pct_longos || 0;
         u._taxaEf = ef.taxa_efetiva || 0;
+        u._marcOcta = ef.marcacao || 0;
+        u._confirmOcta = ef.confirmacao || 0;
+        u._disparoOcta = ef.disparo || 0;
+        u._cancelOcta = ef.cancelamento || 0;
+        u._infoOcta = ef.informacao || 0;
+        u._realOcta = ef.atend_real || 0;
     }
-
-    // Sort
+    // Aplicar sort
     lista.sort((a,b) => {
         const va = a[_sortCol] ?? a['_'+_sortCol] ?? 0;
         const vb = b[_sortCol] ?? b['_'+_sortCol] ?? 0;
-        if (typeof va === 'string') return va.localeCompare(vb) * _sortDir;
         return (va > vb ? 1 : va < vb ? -1 : 0) * _sortDir;
     });
 
@@ -434,105 +405,81 @@ function renderMarcacao(marc, octaMap) {
 
     let h = `<table class="prod-table"><thead><tr>
         <th>#</th><th>Sigla</th>${th('Nome','nome','')}
-        ${th('Lig.','ligacoes','Ligações telefone')}
+        ${th('Lig.','ligacoes','Ligacoes telefone')}
         <th>T.Med</th>
         ${th('WPP','wpp','WhatsApp total')}
         <th>T.Med</th>
-        ${th('ATEND','atendimentos','Total atendimentos (Lig+WPP)')}
-        ${th('Agend.','marcacoes','Agendamentos criados no Kliniki')}
-        ${th('Efic.','_mediaInter','Media interações/chat (menor = mais objetiva)')}
-        ${th('Enrol.','_pctLongos','% chats com mais de 10 interações')}
-        ${th('Conv.','_taxaEf','Taxa conversão marcações/atendimentos')}
+        ${th('ATEND','atendimentos','Total atendimentos')}
+        ${th('Marc.','marcacoes','Marcacoes Kliniki')}
+        ${th('Efic.','_mediaInter','Media interacoes/chat (menor=mais objetiva)')}
+        ${th('Enrol.','_pctLongos','% chats com mais de 10 interacoes')}
+        ${th('Conv.','_taxaEf','Taxa conversao marcacoes/atendimentos')}
         <th></th>
     </tr></thead><tbody>`;
-
     let p=1;
     for(const u of lista){
         const octaInfo = octaMap[u.usuario];
         const tMedWpp = octaInfo && octaInfo.tempo_medio ? fmt(octaInfo.tempo_medio) : '-';
+        const atendimentos = (u.ligacoes||0) + u.wpp;
         const mediaInter = u._mediaInter || '-';
         const pctLongos = u._pctLongos || 0;
         const taxaEf = u._taxaEf || 0;
-        const efColor = mediaInter === '-' ? '#555' : mediaInter <= 5 ? '#2ecc71' : mediaInter <= 8 ? '#f39c12' : '#e94560';
-        const enrolColor = pctLongos === 0 ? '#555' : pctLongos <= 20 ? '#2ecc71' : pctLongos <= 30 ? '#f39c12' : '#e94560';
-        const convColor = taxaEf === 0 ? '#555' : taxaEf >= 20 ? '#2ecc71' : taxaEf >= 12 ? '#3498db' : taxaEf >= 8 ? '#f39c12' : '#e94560';
-
+        // Cor baseada em eficiência
+        const efColor = mediaInter === '-' ? '#666' : mediaInter <= 7 ? '#2ecc71' : mediaInter <= 9 ? '#f39c12' : '#e94560';
+        const enrolColor = pctLongos === 0 ? '#666' : pctLongos <= 25 ? '#2ecc71' : pctLongos <= 33 ? '#f39c12' : '#e94560';
+        const convColor = taxaEf === 0 ? '#666' : taxaEf >= 18 ? '#2ecc71' : taxaEf >= 12 ? '#3498db' : taxaEf >= 8 ? '#f39c12' : '#e94560';
         h+=`<tr><td class="rank-cell">${p++}</td>
-            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td>
+            <td style="font-weight:bold;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td>
             <td class="num-cell">${u.ligacoes||'-'}</td>
-            <td class="num-cell" style="color:#888;">${fmt(u.tempo_medio_lig)}</td>
+            <td class="num-cell">${fmt(u.tempo_medio_lig)}</td>
             <td class="num-cell">${u.wpp||'-'}</td>
-            <td class="num-cell" style="color:#888;">${tMedWpp}</td>
-            <td class="num-cell total-cell">${u.atendimentos||'-'}</td>
-            <td class="num-cell" style="color:#f2c94c;font-weight:600;">${u.marcacoes||0}</td>
-            <td class="num-cell" style="color:${efColor};font-weight:700;" title="Media interações">${mediaInter !== '-' ? mediaInter.toFixed?.(1) ?? mediaInter : '-'}</td>
-            <td class="num-cell" style="color:${enrolColor};font-weight:700;" title="% chats longos">${pctLongos?pctLongos.toFixed?.(0)+'%':'-'}</td>
-            <td class="num-cell" style="color:${convColor};font-weight:700;" title="Taxa conversão">${taxaEf?taxaEf.toFixed?.(1)+'%':'-'}</td>
-            <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')" title="Ocultar">×</button></td></tr>`;
+            <td class="num-cell">${tMedWpp}</td>
+            <td class="num-cell total-cell">${atendimentos||'-'}</td>
+            <td class="num-cell">${u.marcacoes||0}</td>
+            <td class="num-cell" style="color:${efColor};font-weight:700;" title="Media interacoes">${mediaInter}</td>
+            <td class="num-cell" style="color:${enrolColor};font-weight:700;" title="% chats longos">${pctLongos?pctLongos+'%':'-'}</td>
+            <td class="num-cell" style="color:${convColor};font-weight:700;" title="Taxa conversao">${taxaEf?taxaEf+'%':'-'}</td>
+            <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')">x</button></td></tr>`;
     }
-
     const tL=lista.reduce((s,u)=>s+(u.ligacoes||0),0);
     const tW=lista.reduce((s,u)=>s+u.wpp,0);
     const tAtend=tL+tW;
     const tM=lista.reduce((s,u)=>s+(u.marcacoes||0),0);
-    h+=`<tr class="total-row"><td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td>
+    h+=`<tr class="total-row"><td colspan="3" style="text-align:right;">TOTAL</td>
         <td class="num-cell">${tL||'-'}</td><td></td>
         <td class="num-cell">${tW||'-'}</td><td></td>
-        <td class="num-cell total-cell" style="font-size:14px;">${tAtend}</td>
-        <td class="num-cell" style="color:#f2c94c;">${tM}</td>
-        <td colspan="4"></td></tr></tbody></table>`;
+        <td class="num-cell total-cell">${tAtend}</td>
+        <td class="num-cell">${tM}</td><td></td><td></td><td></td><td></td></tr></tbody></table>`;
 
-    // Classificação WhatsApp (da .27) — separado visualmente
+    // Classificação OctaDesk breakdown
     if (octaClassificado && octaClassificado.totais) {
         const t = octaClassificado.totais;
-        const total = t.atend_real || 1;
+        const real = t.atend_real || 1;
         const cats = [
-            {label:'Pediram Marcação',val:t.marcacao,color:'#3a86ff',bg:'rgba(58,134,255,0.12)',key:'marcacao'},
-            {label:'Agendou Efetivo',val:t.agendou_efetivo,color:'#00e676',bg:'rgba(0,230,118,0.12)',key:'agendou'},
-            {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)',key:'confirmacao'},
-            {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)',key:'cancelamento'},
-            {label:'Reclamação',val:t.reclamacao,color:'#ff5252',bg:'rgba(255,82,82,0.12)',key:'reclamacao'},
-            {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)',key:'informacao'},
-            {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.12)',key:'resultado'},
-            {label:'Disparo Massa',val:t.disparo,color:'#666',bg:'rgba(100,100,100,0.12)',key:'disparo'},
+            {label:'Marcacao',val:t.marcacao,color:'#e94560',icon:'📋'},
+            {label:'Confirmacao',val:t.confirmacao,color:'#2ecc71',icon:'✅'},
+            {label:'Disparo Massa',val:t.disparo,color:'#888',icon:'📢'},
+            {label:'Cancelamento',val:t.cancelamento,color:'#e74c3c',icon:'❌'},
+            {label:'Informacao',val:t.informacao,color:'#f39c12',icon:'ℹ️'},
+            {label:'Reclamacao',val:t.reclamacao,color:'#9b59b6',icon:'⚠️'},
         ];
-        h += `<div style="margin-top:18px;"><div style="font-size:12px;font-weight:700;color:#96b7ff;letter-spacing:.08em;margin-bottom:8px;">WHATSAPP — CLASSIFICAÇÃO (${total} conversas)</div>`;
-        h += `<div style="display:flex;gap:10px;flex-wrap:wrap;">`;
+        h += `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">`;
         for (const c of cats) {
-            if (!c.val) continue;
-            const pct = ((c.val||0)/total*100).toFixed(0);
-            const hasDetail = octaClassificado?.detalhes?.[c.key];
-            const cursor = hasDetail ? 'cursor:pointer;' : '';
-            const click = hasDetail ? ` onclick="toggleDetalhe('${c.key}')"` : '';
-            h += `<div style="background:${c.bg};border-radius:10px;padding:12px 16px;border-left:3px solid ${c.color};min-width:110px;flex:1;${cursor}"${click}>
-                <div style="font-size:11px;color:${c.color};font-weight:700;letter-spacing:.05em;">${c.label.toUpperCase()}</div>
-                <div style="font-size:26px;font-weight:800;color:#fff;margin:2px 0;">${c.val}</div>
-                <div style="font-size:11px;color:#666;">${pct}% das conversas${hasDetail ? ' ▼' : ''}</div>
+            const pct = ((c.val||0)/real*100).toFixed(1);
+            h += `<div style="background:#1a2a4a;border-radius:8px;padding:10px 14px;border-left:3px solid ${c.color};min-width:120px;">
+                <div style="font-size:11px;color:#96b7ff;">${c.icon} ${c.label}</div>
+                <div style="font-size:22px;font-weight:800;color:${c.color};">${c.val||0}</div>
+                <div style="font-size:10px;color:#555;">${pct}% do total</div>
             </div>`;
         }
-        h += `</div></div>`;
-
-        // Paineis de detalhe (ocultos até clicar)
-        if (octaClassificado?.detalhes) {
-            for (const [key, items] of Object.entries(octaClassificado.detalhes)) {
-                const labelMap = {reclamacao:'Reclamações',cancelamento:'Cancelamentos',marcacao:'Marcações WhatsApp',resultado:'Resultado/Laudo'};
-                h += `<div id="detalhe_${key}" style="display:none;margin-top:10px;background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto;">`;
-                h += `<div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:8px;">${labelMap[key]||key} — ${items.length} registros</div>`;
-                h += `<table class="prod-table prod-table-sm"><thead><tr><th>Data</th><th>Paciente</th><th>Telefone</th><th>Agente</th></tr></thead><tbody>`;
-                for (const it of items) {
-                    const dataFmt = it.data ? it.data.substring(5,16).replace('-','/') : '-';
-                    h += `<tr><td class="num-cell">${dataFmt}</td><td style="text-align:left;">${it.nome||'-'}</td><td class="num-cell">${it.telefone||'-'}</td><td>${it.agente||'-'}</td></tr>`;
-                }
-                h += `</tbody></table></div>`;
-            }
-        }
+        h += `</div>`;
     }
 
-    // Legenda
-    h += `<div style="margin-top:12px;font-size:10px;color:#555;display:flex;gap:16px;flex-wrap:wrap;padding:4px 0;">
-        <span><b style="color:#96b7ff;">Efic.</b> msgs/chat (<span style="color:#2ecc71">&#9679;</span>≤5 <span style="color:#f39c12">&#9679;</span>≤8 <span style="color:#e94560">&#9679;</span>>8)</span>
-        <span><b style="color:#96b7ff;">Enrol.</b> % longos (<span style="color:#2ecc71">&#9679;</span>≤20% <span style="color:#f39c12">&#9679;</span>≤30% <span style="color:#e94560">&#9679;</span>>30%)</span>
-        <span><b style="color:#96b7ff;">Conv.</b> taxa marc. (<span style="color:#2ecc71">&#9679;</span>≥20% <span style="color:#3498db">&#9679;</span>≥12% <span style="color:#f39c12">&#9679;</span>≥8%)</span>
+    // Legenda de cores
+    h += `<div style="margin-top:10px;font-size:10px;color:#555;display:flex;gap:16px;flex-wrap:wrap;">
+        <span><b>Efic.</b> media msgs/chat (<span style="color:#2ecc71">&#9679;</span>&le;7 <span style="color:#f39c12">&#9679;</span>&le;9 <span style="color:#e94560">&#9679;</span>&gt;9)</span>
+        <span><b>Enrol.</b> % chats longos (<span style="color:#2ecc71">&#9679;</span>&le;25% <span style="color:#f39c12">&#9679;</span>&le;33% <span style="color:#e94560">&#9679;</span>&gt;33%)</span>
+        <span><b>Conv.</b> taxa marcacao (<span style="color:#2ecc71">&#9679;</span>&ge;18% <span style="color:#3498db">&#9679;</span>&ge;12% <span style="color:#f39c12">&#9679;</span>&ge;8%)</span>
     </div>`;
 
     const oc=getOc();
@@ -546,57 +493,51 @@ function renderRecepcao(recep) {
         .sort((a,b)=>(b.admissoes||0)-(a.admissoes||0));
 
     let h = `<table class="prod-table"><thead><tr>
-        <th>#</th><th>Sigla</th><th>Nome</th><th>Admissões</th><th></th>
+        <th>#</th><th>Sigla</th><th>Nome</th><th>Admissoes</th><th></th>
     </tr></thead><tbody>`;
     let p=1;
     for(const u of lista){
         h+=`<tr><td class="rank-cell">${p++}</td>
-            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td>
+            <td style="font-weight:bold;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td>
             <td class="num-cell total-cell">${u.admissoes||0}</td>
-            <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')" title="Ocultar">×</button></td></tr>`;
+            <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')">x</button></td></tr>`;
     }
     const tA=lista.reduce((s,u)=>s+(u.admissoes||0),0);
-    h+=`<tr class="total-row"><td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td>
-        <td class="num-cell total-cell" style="font-size:14px;">${tA}</td><td></td></tr></tbody></table>`;
+    h+=`<tr class="total-row"><td colspan="3" style="text-align:right;">TOTAL</td>
+        <td class="num-cell total-cell">${tA}</td><td></td></tr></tbody></table>`;
     el.panelRecep.innerHTML = h;
 }
 
-// ── Charts ──
-
 function renderChart() {
     const titulo = document.getElementById("tituloChartRank");
-    try {
-        if (currentTab === "marc") {
-            if (titulo) titulo.textContent = "Ranking Marcação";
-            renderChartMarc();
-        } else {
-            if (titulo) titulo.textContent = "Ranking Recepção";
-            renderChartRecep();
-        }
-    } catch(e) { console.warn("Chart error:", e); }
+    if (currentTab === "marc") {
+        if (titulo) titulo.textContent = "Ranking Marcacao";
+        renderChartMarc();
+    } else {
+        if (titulo) titulo.textContent = "Ranking Recepcao";
+        renderChartRecep();
+    }
 }
 
 function renderChartMarc() {
     const octaMap = buildOcta(prodData.octadesk || []);
-    const marc = (prodData.marcacao||[])
-        .filter(u=>!isOc(u.usuario) && !EXCLUIR_RANKING.includes(u.usuario))
+    const marc = (prodData.marcacao||[]).filter(u=>!isOc(u.usuario))
         .map(u=>{const w=(octaMap[u.usuario]||{}).total||0;return{...u,wpp:w,total:(u.marcacoes||0)+(u.ligacoes||0)+w};})
         .filter(u=>u.total>0).sort((a,b)=>b.total-a.total).slice(0,12);
 
     if(chartMarc)chartMarc.destroy();
     if(chartRecep){chartRecep.destroy();chartRecep=null;}
-    if(!marc.length) return;
 
     chartMarc = new Chart(el.chartRank, {
         type:"bar",
         data:{labels:marc.map(u=>u.usuario),datasets:[
-            {label:"Marcações",data:marc.map(u=>u.marcacoes||0),backgroundColor:"#3a86ff"},
-            {label:"Ligações",data:marc.map(u=>u.ligacoes||0),backgroundColor:"#f2c94c"},
+            {label:"Marcacoes",data:marc.map(u=>u.marcacoes||0),backgroundColor:"#3a86ff"},
+            {label:"Ligacoes",data:marc.map(u=>u.ligacoes||0),backgroundColor:"#f2c94c"},
             {label:"WhatsApp",data:marc.map(u=>u.wpp),backgroundColor:"#25d366"}
         ]},
         options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{labels:{color:"#fff",boxWidth:10,font:{size:11}}},datalabels:{display:false}},
-            scales:{x:{stacked:true,ticks:{color:"#fff",font:{size:11}},grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{color:"#666"},grid:{color:"rgba(255,255,255,0.05)"}}}
+            plugins:{legend:{labels:{color:"#fff",boxWidth:10}},datalabels:{display:false}},
+            scales:{x:{stacked:true,ticks:{color:"#fff"},grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{color:"#aaa"},grid:{color:"rgba(255,255,255,0.1)"}}}
         }
     });
 }
@@ -607,16 +548,15 @@ function renderChartRecep() {
 
     if(chartRecep)chartRecep.destroy();
     if(chartMarc){chartMarc.destroy();chartMarc=null;}
-    if(!recep.length) return;
 
     chartRecep = new Chart(el.chartRank, {
         type:"bar",
         data:{labels:recep.map(u=>u.usuario),datasets:[
-            {label:"Admissões",data:recep.map(u=>u.admissoes||0),backgroundColor:"#4cc9f0"}
+            {label:"Admissoes",data:recep.map(u=>u.admissoes||0),backgroundColor:"#4cc9f0"}
         ]},
         options:{responsive:true,maintainAspectRatio:false,
             plugins:{legend:{labels:{color:"#fff",boxWidth:10}},datalabels:{color:"#fff",anchor:"end",align:"top",font:{size:10,weight:"bold"}}},
-            scales:{x:{ticks:{color:"#fff"},grid:{display:false}},y:{beginAtZero:true,ticks:{color:"#666"},grid:{color:"rgba(255,255,255,0.05)"}}}
+            scales:{x:{ticks:{color:"#fff"},grid:{display:false}},y:{beginAtZero:true,ticks:{color:"#aaa"},grid:{color:"rgba(255,255,255,0.1)"}}}
         }
     });
 }
@@ -633,16 +573,17 @@ function renderChartWpp(octa) {
                 {label:"Enviados",data:sorted.map(a=>a.outbound||0),backgroundColor:"#128c7e"}]},
         options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
             plugins:{legend:{labels:{color:"#fff",boxWidth:10}},datalabels:{color:"#fff",font:{size:9,weight:"bold"}}},
-            scales:{x:{stacked:true,ticks:{color:"#666"},grid:{color:"rgba(255,255,255,0.05)"}},
+            scales:{x:{stacked:true,ticks:{color:"#aaa"},grid:{color:"rgba(255,255,255,0.1)"}},
                 y:{stacked:true,ticks:{color:"#fff",font:{size:10}},grid:{display:false}}}}
     });
 }
 
-// ── Timeline ──
+// ── Timeline ──────────────────────────────────────────────────────────
 
-const API_TIMELINE = API_BASE + "/timeline";
+const API_TIMELINE = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/timeline";
 const ST_RAMAIS = "cavalieri_ramais_custom";
 
+// Mapa padrão (vem do backend, mas editável no frontend)
 const MAPA_PADRAO = {
     "192.168.0.1":  {host:"205MARC01",  ramal:null,   setor:"marcacao"},
     "192.168.0.2":  {host:"205MARC02",  ramal:"2056", setor:"marcacao"},
@@ -682,10 +623,68 @@ function getMapaRamais() {
     return mapa;
 }
 
+function renderEditorRamais(mapaEstacoes) {
+    const div = document.getElementById("editorRamais");
+    if (!div) return;
+    const mapa = mapaEstacoes || MAPA_PADRAO;
+    const custom = getRamaisCustom();
+
+    let h = `<table class="prod-table prod-table-sm"><thead><tr>
+        <th>IP</th><th>Hostname</th><th>Setor</th><th>Ramal Padrao</th><th>Ramal Atual</th>
+    </tr></thead><tbody>`;
+
+    const ips = Object.keys(mapa).sort((a, b) => {
+        const na = a.split('.').map(Number);
+        const nb = b.split('.').map(Number);
+        return na[3] - nb[3];
+    });
+
+    for (const ip of ips) {
+        const info = mapa[ip] || {};
+        const ramalPadrao = info.ramal || '-';
+        const ramalAtual = custom[ip] || info.ramal || '';
+        const isCustom = custom[ip] && custom[ip] !== info.ramal;
+
+        h += `<tr${isCustom ? ' style="background:rgba(242,201,76,0.1);"' : ''}>
+            <td style="font-weight:bold;">${ip}</td>
+            <td>${info.host || ip}</td>
+            <td><span class="timeline-setor-tag tag-${info.setor || 'outro'}">${(info.setor || 'outro').toUpperCase()}</span></td>
+            <td class="num-cell">${ramalPadrao}</td>
+            <td><input type="text" class="ramal-input" data-ip="${ip}" value="${ramalAtual}"
+                style="width:60px;padding:4px;background:#0f1738;color:#fff;border:1px solid ${isCustom ? '#f2c94c' : '#3a86ff'};border-radius:4px;text-align:center;" /></td>
+        </tr>`;
+    }
+
+    h += `</tbody></table>`;
+    div.innerHTML = h;
+
+    // Bind salvar/reset
+    document.getElementById("btnSalvarRamais").onclick = () => {
+        const custom = {};
+        document.querySelectorAll(".ramal-input").forEach(input => {
+            const ip = input.dataset.ip;
+            const val = input.value.trim();
+            const padrao = (mapa[ip] || {}).ramal || '';
+            if (val && val !== padrao) custom[ip] = val;
+        });
+        localStorage.setItem(ST_RAMAIS, JSON.stringify(custom));
+        renderEditorRamais(mapa);
+        showSt("Ramais salvos! Recarregue os dados para aplicar.", "info");
+        setTimeout(hideSt, 3000);
+    };
+
+    document.getElementById("btnResetRamais").onclick = () => {
+        localStorage.removeItem(ST_RAMAIS);
+        renderEditorRamais(mapa);
+        showSt("Ramais resetados para padrao.", "info");
+        setTimeout(hideSt, 3000);
+    };
+}
+
 async function carregarTimeline() {
     const data = el.timelineData.value;
     if (!data) return;
-    el.timelineConteudo.innerHTML = '<div style="color:#96b7ff;padding:20px;text-align:center;"><div style="font-size:24px;margin-bottom:8px;">&#9203;</div>Carregando timeline...</div>';
+    el.timelineConteudo.innerHTML = '<div style="color:#96b7ff;padding:10px;">Carregando timeline...</div>';
 
     try {
         const res = await fetch(`${API_TIMELINE}?data=${data}`);
@@ -693,49 +692,48 @@ async function carregarTimeline() {
         if (!json.ok) throw new Error(json.erro || "Erro");
         renderTimeline(json.timeline, json.nomes, json.mapa_estacoes, data);
     } catch (err) {
-        el.timelineConteudo.innerHTML = `<div style="color:#ffb3c1;padding:20px;text-align:center;">Falha: ${err.message}<br><button onclick="carregarTimeline()" style="margin-top:8px;">Tentar novamente</button></div>`;
+        el.timelineConteudo.innerHTML = `<div style="color:#ffb3c1;padding:10px;">Falha: ${err.message}</div>`;
     }
 }
 
 function renderTimeline(timeline, nomes, mapaBackend, data) {
+    // Aplicar ramais customizados sobre o mapa do backend
     const custom = getRamaisCustom();
     const mapa = {};
     for (const ip in mapaBackend) {
         mapa[ip] = { ...mapaBackend[ip] };
         if (custom[ip]) mapa[ip].ramal = custom[ip];
     }
+    // Aplicar custom nos dados da timeline
     for (const usr in timeline) {
         for (const s of timeline[usr]) {
             if (custom[s.ip]) s.ramal = custom[s.ip];
         }
     }
-
+    // Bind reset ramais
     const btnReset = document.getElementById("btnResetRamais");
     if (btnReset) {
         btnReset.onclick = () => {
-            if (!confirm("Resetar todos os ramais para o padrão?")) return;
             localStorage.removeItem(ST_RAMAIS);
             carregarTimeline();
-            carregarProd();
+            carregarProd(prodPeriodo === "hoje");
             showSt("Ramais resetados.", "info"); setTimeout(hideSt, 2000);
         };
     }
-
     const usuarios = Object.keys(timeline).sort((a, b) => {
         const ha = timeline[a][0] ? timeline[a][0].hora : 'z';
         const hb = timeline[b][0] ? timeline[b][0].hora : 'z';
         return ha.localeCompare(hb);
     });
 
+    // Filtrar só quem logou em marcação ou recepção
     const atendentes = usuarios.filter(usr => {
         return timeline[usr].some(s => s.setor === 'marcacao' || s.setor === 'recepcao');
     });
 
     const dataBr = data.split('-').reverse().join('/');
 
-    let h = `<div style="color:#96b7ff;font-size:12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-        <span style="font-size:16px;">&#128197;</span> ${dataBr} — ${atendentes.length} atendentes com atividade
-    </div>`;
+    let h = `<div style="color:#96b7ff;font-size:12px;margin-bottom:10px;">${dataBr} — ${atendentes.length} atendentes com atividade</div>`;
 
     for (const usr of atendentes) {
         const sessoes = timeline[usr];
@@ -747,7 +745,7 @@ function renderTimeline(timeline, nomes, mapaBackend, data) {
         h += `<div class="timeline-header">
             <span class="timeline-sigla">${usr}</span>
             <span class="timeline-nome">${nome}</span>
-            <span style="color:#96b7ff;font-size:11px;">${primeiraHora} — ${ultimaHora} (${sessoes.length} sessões)</span>
+            <span style="color:#96b7ff;font-size:11px;">${primeiraHora} — ${ultimaHora} (${sessoes.length} sessoes)</span>
         </div>`;
         h += `<div class="timeline-sessoes">`;
 
@@ -771,6 +769,7 @@ function renderTimeline(timeline, nomes, mapaBackend, data) {
         h += `</div></div>`;
     }
 
+    // Outros (médicos, TI, etc)
     const outros = usuarios.filter(usr => !atendentes.includes(usr));
     if (outros.length) {
         h += `<details style="margin-top:12px;"><summary style="color:#96b7ff;font-size:12px;cursor:pointer;">Outros usuarios (${outros.length})</summary>`;
@@ -787,6 +786,7 @@ function renderTimeline(timeline, nomes, mapaBackend, data) {
 
     el.timelineConteudo.innerHTML = h;
 
+    // Bind inline ramal edits — salva ao sair do campo
     document.querySelectorAll(".ramal-inline").forEach(input => {
         input.addEventListener("change", () => {
             const ip = input.dataset.ip;
@@ -801,27 +801,20 @@ function renderTimeline(timeline, nomes, mapaBackend, data) {
                 input.style.borderColor = '#2f4f9c';
             }
             localStorage.setItem(ST_RAMAIS, JSON.stringify(custom));
+            // Atualizar backend com novo mapa e recarregar produtividade
             enviarMapaERecarregar();
         });
     });
 }
 
-function toggleDetalhe(key) {
-    const el = document.getElementById('detalhe_' + key);
-    if (!el) return;
-    // Fechar outros
-    document.querySelectorAll('[id^="detalhe_"]').forEach(d => {
-        if (d !== el) d.style.display = 'none';
-    });
-    el.style.display = el.style.display === 'none' ? '' : 'none';
-}
-
 let _recarregarTimer = null;
 function enviarMapaERecarregar() {
+    // Debounce — espera 1s após última edição
     if (_recarregarTimer) clearTimeout(_recarregarTimer);
     _recarregarTimer = setTimeout(() => {
         showSt("Ramal atualizado, recalculando...", "info");
-        carregarProd();
+        // Enviar mapa custom pro backend via query param
+        carregarProd(prodPeriodo === "hoje");
         setTimeout(hideSt, 2000);
     }, 1000);
 }
