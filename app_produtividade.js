@@ -346,11 +346,11 @@ function renderMarcacao(marc, octaMap) {
 
     let h = `<table class="prod-table"><thead><tr>
         <th>#</th><th>Sigla</th>${th('Nome','nome','')}
-        ${th('Lig.','ligacoes','Ligações telefone')}<th>T.Med</th>
-        ${th('WPP','wpp','WhatsApp total')}<th>T.Med</th>
-        ${th('ATEND','atendimentos','Lig+WPP')}
+        ${th('Tel','ligacoes','Ligações telefone')}<th>T.Med</th>
+        ${th('WPP','wpp','Conversas WhatsApp')}<th>T.Med</th>
+        ${th('ATEND','atendimentos','Tel+WPP')}
         ${th('Agend.','marcacoes','Agendamentos Kliniki')}
-        ${th('Efic.','_mediaInter','Msgs/chat (menor=mais objetiva)')}${th('Enrol.','_pctLongos','% chats longos')}${th('Conv.','_taxaEf','% marcações/conversas')}
+        ${th('Efic.','_mediaInter','Msgs/chat WPP (menor=mais objetiva)')}${th('Enrol.','_pctLongos','% chats WPP longos (>10 msgs)')}${th('Conv.','_taxaEf','% conversas WPP que viraram marcação')}
         <th></th></tr></thead><tbody>`;
 
     let p=1;
