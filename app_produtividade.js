@@ -284,15 +284,21 @@ function renderCards(marc, recep, octa) {
     const cWpp = canal.whatsapp || 0, cTel = canal.telefone || 0, cHib = canal.hibrido || 0, cDir = canal.agendado_direto || 0;
     const cTotal = cWpp + cTel + cHib + cDir;
 
+    // Cards com agendamentos por canal
+    const agTel = cTel + cHib;  // telefone + hibrido = teve ligação
+    const agWpp = cWpp + cHib;  // whatsapp + hibrido = teve chat
+    const pctTel = cTotal > 0 ? (cTel/cTotal*100).toFixed(0) : '-';
+    const pctWpp = cTotal > 0 ? (cWpp/cTotal*100).toFixed(0) : '-';
+
     el.cardTel.innerHTML = `<div class="prod-card-title">TELEFONE</div>
         <div class="prod-card-big">${tLig || '-'}</div>
         <div class="prod-card-label">${label}</div>
-        ${tLig ? `<div class="prod-card-sub">Ligações 3CX</div>` : ''}`;
+        <div class="prod-card-sub">${tLig ? tLig+' ligações 3CX' : ''}${agTel ? ` | <b>${agTel}</b> agendaram (${pctTel}%)` : ''}</div>`;
 
     el.cardWpp.innerHTML = `<div class="prod-card-title">WHATSAPP</div>
         <div class="prod-card-big">${tWpp || '-'}</div>
         <div class="prod-card-label">${label}</div>
-        ${tWpp ? `<div class="prod-card-sub">Conversas OctaDesk</div>` : ''}`;
+        <div class="prod-card-sub">${tWpp ? tWpp+' conversas' : ''}${agWpp ? ` | <b>${agWpp}</b> agendaram (${pctWpp}%)` : ''}</div>`;
 
     let canalHtml = '';
     if (cTotal > 0) {
