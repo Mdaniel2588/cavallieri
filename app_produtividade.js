@@ -240,7 +240,7 @@ async function carregarProd() {
             if(j2.ok&&j2.data){
                 octaClassificado = j2.data;
                 prodData.octadesk = (j2.data.agentes||[]).map(a => ({
-                    agente: a.agent_name, total: a.atend_real||0, inbound: 0, outbound: 0, tempo_medio: 0
+                    agente: a.agent_name, total: a.atend_real||0, inbound: 0, outbound: 0, tempo_medio: a.tempo_medio||0
                 }));
             }
         } catch(e) { console.warn("API WhatsApp:", e); }
@@ -533,6 +533,7 @@ const MAPA_PADRAO = {
     "192.168.0.37":{host:"602RECEP03",ramal:"6022",setor:"recepcao"},
     "192.168.0.38":{host:"606RECEP01",ramal:"6061",setor:"recepcao"},"192.168.0.39":{host:"606RECEP02",ramal:"6062",setor:"recepcao"},
     "192.168.0.40":{host:"606RECEP03",ramal:"6062",setor:"recepcao"},"192.168.0.41":{host:"BIOPSIA",ramal:null,setor:"outro"},
+    "192.168.0.196":{host:"RAC",ramal:"2050",setor:"marcacao"},"192.168.0.217":{host:"RAC2",ramal:"2050",setor:"marcacao"},
 };
 function getRamaisCustom() { try { const r = localStorage.getItem(ST_RAMAIS); if (r) return JSON.parse(r); } catch(e) {} return {}; }
 
