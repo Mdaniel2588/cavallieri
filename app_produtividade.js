@@ -122,7 +122,7 @@ function _renderCalProd() {
 
     if (!_pcalExpanded) {
         html += '<div class="cal-quick" style="margin-top:4px;">';
-        for (const q of [{id:"hoje",label:"HOJE"},{id:"semana",label:"SEMANA"},{id:"mes",label:"MES"},{id:"trimestre",label:"TRIMESTRE"}])
+        for (const q of [{id:"hoje",label:"HOJE"},{id:"semana",label:"SEMANA"},{id:"mes",label:"MÊS"},{id:"trimestre",label:"TRIMESTRE"},{id:"semestral",label:"SEMESTRE"},{id:"anual",label:"ANO"}])
             html += '<button class="cal-qbtn' + (_pcalQuick===q.id?" active":"") + '" data-quick="' + q.id + '" type="button">' + q.label + '</button>';
         html += '</div>';
         box.innerHTML = html; _bindCalProdHeader(box); return;
@@ -148,7 +148,7 @@ function _renderCalProd() {
     const cU = iS + uD; for (let i = 1; i <= (7-(cU%7))%7; i++) html += '<div class="cal-day outside">' + i + '</div>';
     html += '</div>';
     html += '<div class="cal-quick">';
-    for (const q of [{id:"hoje",label:"HOJE"},{id:"semana",label:"SEMANA"},{id:"mes",label:"MES"},{id:"trimestre",label:"TRIMESTRE"}])
+    for (const q of [{id:"hoje",label:"HOJE"},{id:"semana",label:"SEMANA"},{id:"mes",label:"MÊS"},{id:"trimestre",label:"TRIMESTRE"},{id:"semestral",label:"SEMESTRE"},{id:"anual",label:"ANO"}])
         html += '<button class="cal-qbtn' + (_pcalQuick===q.id?" active":"") + '" data-quick="' + q.id + '" type="button">' + q.label + '</button>';
     html += '</div>';
     if (textoSel) html += '<div class="cal-selection">Selecionado: ' + textoSel + '</div>';
@@ -187,6 +187,8 @@ function _handleProdQuick(tipo) {
     else if (tipo === "semana") { const dow=h.getDay(); const seg=h.getDate()-(dow===0?6:dow-1); _pcalSelA=new Date(h.getFullYear(),h.getMonth(),seg); _pcalSelB=new Date(h.getFullYear(),h.getMonth(),h.getDate()); prodPeriodo = "semana"; }
     else if (tipo === "mes") { _pcalSelA=new Date(h.getFullYear(),h.getMonth(),1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "mes"; }
     else if (tipo === "trimestre") { _pcalSelA=new Date(h.getFullYear(),h.getMonth()-2,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "trimestre"; }
+    else if (tipo === "semestral") { _pcalSelA=new Date(h.getFullYear(),h.getMonth()-5,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "semestral"; }
+    else if (tipo === "anual") { _pcalSelA=new Date(h.getFullYear(),0,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "anual"; }
     _pcalMes = h.getMonth(); _pcalAno = h.getFullYear(); _pcalExpanded = false;
     _applyCalProd(); _renderCalProd(); carregarProd();
 }
@@ -220,7 +222,7 @@ async function carregarProd() {
     const custom = getRamaisCustom();
     const mapaParam = Object.keys(custom).length ? '&mapa=' + encodeURIComponent(JSON.stringify(custom)) : '';
     let periodoParam = prodPeriodo, dateParams = '';
-    if (prodPeriodo === "trimestre" || prodPeriodo === "custom" || (_pcalSelA && _pcalSelB && !_pcalQuick)) {
+    if (["trimestre","semestral","anual","custom"].includes(prodPeriodo) || (_pcalSelA && _pcalSelB && !_pcalQuick)) {
         periodoParam = "custom"; dateParams = `&data_inicio=${range.ini}&data_fim=${range.fim}`;
     }
 
@@ -266,6 +268,8 @@ function renderTitulo() {
     if (prodPeriodo === "hoje") { const h = new Date(); txt = `PRODUTIVIDADE | HOJE ${String(h.getDate()).padStart(2,'0')}/${String(h.getMonth()+1).padStart(2,'0')}/${h.getFullYear()}`; }
     else if (_pcalQuick === "semana") txt = `PRODUTIVIDADE | SEMANA CORRENTE`;
     else if (_pcalQuick === "trimestre") txt = `PRODUTIVIDADE | TRIMESTRE`;
+    else if (_pcalQuick === "semestral") txt = `PRODUTIVIDADE | SEMESTRE`;
+    else if (_pcalQuick === "anual") txt = `PRODUTIVIDADE | ANO ${new Date().getFullYear()}`;
     else if (prodPeriodo === "mes") { const m = prodData.mes || (new Date().getMonth()+1); txt = `PRODUTIVIDADE | ${_meses[m] || ''} ${prodData.ano || new Date().getFullYear()}`; }
     else { const ini = range.ini.split('-').reverse().join('/'), fim = range.fim.split('-').reverse().join('/'); txt = ini === fim ? `PRODUTIVIDADE | ${ini}` : `PRODUTIVIDADE | ${ini} a ${fim}`; }
     titulo.textContent = txt;
@@ -273,7 +277,7 @@ function renderTitulo() {
 
 function renderCards(marc, recep, octa) {
     const tLig = prodData.ligacoes_total || 0;
-    const labelMap = {"hoje":"Hoje","semana":"Semana","mes":_meses[(prodData.mes||1)],"trimestre":"Trimestre","custom":"Periodo"};
+    const labelMap = {"hoje":"Hoje","semana":"Semana","mes":_meses[(prodData.mes||1)],"trimestre":"Trimestre","semestral":"Semestre","anual":"Ano","custom":"Periodo"};
     const label = labelMap[_pcalQuick] || labelMap[prodPeriodo] || "Periodo";
     const tWpp = octa.reduce((s,a)=>s+(a.total||0),0);
     const tMa = marc.filter(u=>!EXCLUIR_RANKING.includes(u.usuario)).reduce((s,u)=>s+(u.marcacoes||0),0);
@@ -346,7 +350,7 @@ function renderMarcacao(marc, octaMap) {
         ${th('WPP','wpp','WhatsApp total')}<th>T.Med</th>
         ${th('ATEND','atendimentos','Lig+WPP')}
         ${th('Agend.','marcacoes','Agendamentos Kliniki')}
-        ${th('Efic.','_mediaInter','Msgs/chat')}<th>Enrol.</th>${th('Conv.','_taxaEf','Taxa conversão')}
+        ${th('Efic.','_mediaInter','Msgs/chat (menor=mais objetiva)')}${th('Enrol.','_pctLongos','% chats longos')}${th('Conv.','_taxaEf','% marcações/conversas')}
         <th></th></tr></thead><tbody>`;
 
     let p=1;
