@@ -27,6 +27,7 @@ let chartWpp = null;
 let octaClassificado = null;
 let _sortCol = 'atendimentos';
 let _sortDir = -1;
+let _canal = {};  // dados de canal (global)
 const el = {};
 
 const OCTA_MAP_REV = {};
@@ -280,8 +281,8 @@ function renderCards(marc, recep, octa) {
     const pv = prodData.pacientes_primeira_vez || 0;
 
     // Canal real da .27
-    const canal = octaClassificado?.canal || {};
-    const cWpp = canal.whatsapp || 0, cTel = canal.telefone || 0, cHib = canal.hibrido || 0, cDir = canal.agendado_direto || 0;
+    _canal = octaClassificado?.canal || {};
+    const cWpp = _canal.whatsapp || 0, cTel = _canal.telefone || 0, cHib = _canal.hibrido || 0, cDir = _canal.agendado_direto || 0;
     const cTotal = cWpp + cTel + cHib + cDir;
 
     // Telefone — ligações + quantas geraram agendamento + %
@@ -385,35 +386,44 @@ function renderMarcacao(marc, octaMap) {
         <td class="num-cell" style="color:#f2c94c;">${tM}</td><td colspan="4"></td></tr></tbody></table>`;
 
     // Cards de classificação — canal real + WhatsApp
+    const cWpp = _canal.whatsapp||0, cTel = _canal.telefone||0, cHib = _canal.hibrido||0, cDir = _canal.agendado_direto||0, cTotal = cWpp+cTel+cHib+cDir;
+    const tMa = lista.reduce((s,u)=>s+(u.marcacoes||0),0) + diretos.reduce((s,u)=>s+(u.marcacoes||0),0);
     if (octaClassificado?.totais || cTotal > 0) {
         const t = octaClassificado?.totais || {};
         const total = t.atend_real || 1;
         const cats = [
-            {label:'Agendaram via WhatsApp',val:cWpp,color:'#25d366',bg:'rgba(37,211,102,0.12)',key:'marcacao'},
-            {label:'Agendaram via Telefone',val:cTel+cHib,color:'#3a86ff',bg:'rgba(58,134,255,0.12)',key:null},
-            {label:'Agendado Direto',val:cDir,color:'#9b59b6',bg:'rgba(155,89,182,0.12)',key:null},
-            {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)',key:null},
-            {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)',key:'cancelamento'},
-            {label:'Reclamação',val:t.reclamacao,color:'#ff5252',bg:'rgba(255,82,82,0.12)',key:'reclamacao'},
-            {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)',key:null},
-            {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.08)',key:'resultado'},
+            {label:'Via WhatsApp',val:cWpp,color:'#25d366',bg:'rgba(37,211,102,0.12)',key:'marcacao',base:cTotal,showPct:true},
+            {label:'Via Telefone',val:cTel+cHib,color:'#3a86ff',bg:'rgba(58,134,255,0.12)',key:null,base:cTotal,showPct:true},
+            {label:'Ag. Direto',val:cDir,color:'#9b59b6',bg:'rgba(155,89,182,0.12)',key:null,base:cTotal,showPct:true},
+            {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)',key:null,base:total},
+            {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)',key:'cancelamento',base:total},
+            {label:'Reclamação',val:t.reclamacao,color:'#ff5252',bg:'rgba(255,82,82,0.12)',key:'reclamacao',base:total},
+            {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)',key:null,base:total},
+            {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.08)',key:'resultado',base:total},
         ];
         const totalAgend = cTotal || tMa || 1;
         h += `<div style="margin-top:18px;"><div style="font-size:12px;font-weight:700;color:#96b7ff;letter-spacing:.08em;margin-bottom:8px;">AGENDAMENTOS POR CANAL + WHATSAPP (${tMa} agendamentos | ${total} conversas)</div>`;
         h += `<div style="display:flex;gap:10px;flex-wrap:wrap;">`;
         for (const c of cats) {
             if (!c.val) continue;
-            // Canal usa cTotal como base, WhatsApp usa total conversas
-            const base = c.key === 'marcacao' || !c.key ? totalAgend : total;
-            const pct = ((c.val||0)/base*100).toFixed(0);
-            const hasDetail = octaClassificado?.detalhes?.[c.key];
+            const pct = ((c.val||0)/(c.base||1)*100).toFixed(0);
+            const hasDetail = c.key && octaClassificado?.detalhes?.[c.key];
             const cursor = hasDetail ? 'cursor:pointer;' : '';
             const click = hasDetail ? ` onclick="toggleDetalhe('${c.key}')"` : '';
-            h += `<div style="background:${c.bg};border-radius:10px;padding:12px 16px;border-left:3px solid ${c.color};min-width:110px;flex:1;${cursor}"${click}>
-                <div style="font-size:11px;color:${c.color};font-weight:700;letter-spacing:.05em;">${c.label.toUpperCase()}</div>
-                <div style="font-size:26px;font-weight:800;color:#fff;margin:2px 0;">${c.val}</div>
-                <div style="font-size:11px;color:#666;">${pct}%${hasDetail ? ' ▼' : ''}</div>
-            </div>`;
+            if (c.showPct) {
+                // Canal: % grande, número pequeno
+                h += `<div style="background:${c.bg};border-radius:10px;padding:12px 16px;border-left:3px solid ${c.color};min-width:110px;flex:1;${cursor}"${click}>
+                    <div style="font-size:11px;color:${c.color};font-weight:700;letter-spacing:.05em;">${c.label.toUpperCase()}</div>
+                    <div style="font-size:26px;font-weight:800;color:#fff;margin:2px 0;">${pct}%</div>
+                    <div style="font-size:11px;color:#666;">${c.val} agendamentos${hasDetail ? ' ▼' : ''}</div>
+                </div>`;
+            } else {
+                h += `<div style="background:${c.bg};border-radius:10px;padding:12px 16px;border-left:3px solid ${c.color};min-width:110px;flex:1;${cursor}"${click}>
+                    <div style="font-size:11px;color:${c.color};font-weight:700;letter-spacing:.05em;">${c.label.toUpperCase()}</div>
+                    <div style="font-size:26px;font-weight:800;color:#fff;margin:2px 0;">${c.val}</div>
+                    <div style="font-size:11px;color:#666;">${pct}% das conversas${hasDetail ? ' ▼' : ''}</div>
+                </div>`;
+            }
         }
         h += `</div></div>`;
 
@@ -438,8 +448,6 @@ function renderMarcacao(marc, octaMap) {
         <span><b style="color:#96b7ff;">Conv.</b> taxa marc. (<span style="color:#2ecc71">&#9679;</span>≥20% <span style="color:#3498db">&#9679;</span>≥12% <span style="color:#f39c12">&#9679;</span>≥8%)</span>
     </div>`;
 
-    const oc=getOc();
-    if(oc.length) h+=`<div style="margin-top:8px;font-size:11px;color:#96b7ff;">Ocultos: ${oc.map(s=>`<button class="btn-restaurar" onclick="toggleOc('${s}')">${s}</button>`).join(' ')}</div>`;
     el.panelMarc.innerHTML = h;
 }
 
@@ -560,6 +568,18 @@ function renderTimeline(timeline, nomes, mapaBackend, data) {
         for (const usr of outros) { const ss = timeline[usr]; h += `<div style="padding:4px 0;font-size:12px;color:#dce7ff;"><b>${usr}</b> ${(nomes[usr]||'').substring(0,25)} — ${ss.map(s=>s.hora.substring(11,16)+' '+s.hostname).join(' → ')}</div>`; }
         h += `</details>`; }
     el.timelineConteudo.innerHTML = h;
+
+    // Ocultos — gerenciar dentro da timeline
+    const ocDiv = document.getElementById("ocultosMgmt");
+    if (ocDiv) {
+        const oc = getOc();
+        if (oc.length) {
+            ocDiv.innerHTML = `<div style="font-size:11px;color:#96b7ff;">Ocultos no ranking: ${oc.map(s=>`<button class="btn-restaurar" onclick="toggleOc('${s}')">${s} ✕</button>`).join(' ')}</div>`;
+        } else {
+            ocDiv.innerHTML = '';
+        }
+    }
+
     document.querySelectorAll(".ramal-inline").forEach(input => { input.addEventListener("change", () => {
         const ip = input.dataset.ip, val = input.value.trim(), c = getRamaisCustom(), pad = (MAPA_PADRAO[ip]||{}).ramal||'';
         if (val && val !== pad) { c[ip] = val; input.style.borderColor = '#f2c94c'; } else { delete c[ip]; input.style.borderColor = '#2f4f9c'; }
