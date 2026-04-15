@@ -247,6 +247,22 @@ async function carregarProd() {
 
         renderProd(); hideSt();
         if(prodPeriodo==="hoje"){showSt("Realtime — atualiza a cada 2 min","info");setTimeout(hideSt,4000);}
+
+        // Tempo médio WPP: buscar do com_octa=1 em background (não bloqueia)
+        const tmUrl = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_octa=1${dateParams}`;
+        fetch(tmUrl).then(r=>r.json()).then(j=>{
+            if(j.ok&&j.data&&j.data.octadesk){
+                const tmMap = {};
+                for(const a of j.data.octadesk) tmMap[a.agente] = a.tempo_medio||0;
+                // Merge tempo_medio no octadesk existente
+                if(prodData.octadesk){
+                    for(const a of prodData.octadesk){
+                        if(tmMap[a.agente]) a.tempo_medio = tmMap[a.agente];
+                    }
+                }
+                renderProd();
+            }
+        }).catch(()=>{});
     } catch(err) { showSt("Falha: "+err.message,"error"); }
 }
 
