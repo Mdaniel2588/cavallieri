@@ -494,6 +494,15 @@ canvas {
 
     .prod-cards {
         flex-direction: column;
+        padding: 6px;
+    }
+
+    .prod-card {
+        padding: 14px 12px 10px;
+    }
+
+    .prod-card-big {
+        font-size: 28px;
     }
 
     .prod-charts {
@@ -501,11 +510,99 @@ canvas {
     }
 
     .prod-chart-box {
-        height: 300px !important;
+        height: 280px !important;
+        min-height: 240px;
     }
 
     .prod-table-wrapper {
         overflow-x: auto;
+        padding: 6px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .prod-table {
+        min-width: 700px;
+    }
+
+    .prod-subtabs {
+        padding: 6px 6px 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .prod-subtab {
+        padding: 8px 16px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .header-container {
+        padding: 10px 12px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .brand {
+        font-size: 16px;
+    }
+
+    .header-nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .nav-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .header-right {
+        gap: 6px;
+    }
+
+    .nome-logado {
+        font-size: 11px;
+    }
+
+    .filters {
+        padding: 10px;
+    }
+
+    .cal-quick {
+        flex-wrap: wrap;
+    }
+
+    .cal-quick button, .cal-qbtn {
+        padding: 4px 8px !important;
+        font-size: 10px !important;
+    }
+
+    .cal-grid {
+        font-size: 11px;
+    }
+
+    .cal-day {
+        padding: 4px 1px;
+    }
+
+    .timeline-user {
+        margin-bottom: 8px;
+    }
+
+    .timeline-header {
+        padding: 8px 10px;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .timeline-sessao {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .login-box {
+        padding: 20px;
     }
 }
 
