@@ -229,14 +229,14 @@ async function carregarProd() {
     const url = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_3cx=1${mapaParam}${dateParams}`;
     showSt("Carregando...", "info");
     try {
-        const r1 = await fetch(url); const j1 = await r1.json();
+        const r1 = await window.apiFetch(url); const j1 = await r1.json();
         if (!j1.ok) throw new Error(j1.erro||"Erro");
         prodData = j1.data;
 
         // WhatsApp + canal via proxy clinic_bridge → .27
         const octaUrl = `${API_WHATSAPP}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
         try {
-            const r2 = await fetch(octaUrl); const j2 = await r2.json();
+            const r2 = await window.apiFetch(octaUrl); const j2 = await r2.json();
             if(j2.ok&&j2.data){
                 octaClassificado = j2.data;
                 prodData.octadesk = (j2.data.agentes||[]).map(a => ({
@@ -250,7 +250,7 @@ async function carregarProd() {
 
         // Tempo médio WPP: buscar do com_octa=1 em background (não bloqueia)
         const tmUrl = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_octa=1${dateParams}`;
-        fetch(tmUrl).then(r=>r.json()).then(j=>{
+        window.apiFetch(tmUrl).then(r=>r.json()).then(j=>{
             if(j.ok&&j.data&&j.data.octadesk){
                 const tmMap = {};
                 for(const a of j.data.octadesk) tmMap[a.agente] = a.tempo_medio||0;
@@ -557,7 +557,7 @@ async function carregarTimeline() {
     const data = el.timelineData.value; if (!data) return;
     el.timelineConteudo.innerHTML = '<div style="color:#96b7ff;padding:20px;text-align:center;">Carregando timeline...</div>';
     try {
-        const res = await fetch(`${API_TIMELINE}?data=${data}`); const json = await res.json();
+        const res = await window.apiFetch(`${API_TIMELINE}?data=${data}`); const json = await res.json();
         if (!json.ok) throw new Error(json.erro || "Erro");
         renderTimeline(json.timeline, json.nomes, json.mapa_estacoes, data);
     } catch (err) { el.timelineConteudo.innerHTML = `<div style="color:#ffb3c1;padding:20px;">Falha: ${err.message}<br><button onclick="carregarTimeline()" style="margin-top:8px;">Tentar novamente</button></div>`; }

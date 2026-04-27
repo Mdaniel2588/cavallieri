@@ -19,109 +19,57 @@ const opcoesMeses = nomesMeses.slice(1).map((nome, index) => ({ value: index + 1
 const hoje = new Date();
 const STORAGE_CAPACIDADE = "cavalieri_capacidade_diaria";
 const API_OCUPACAO = "https://kliniki.cavalliericlinica.com.br:444/klinikinew/index.php/api_agenda/get_ocupacao";
-const MASTER_USER = { login: "MD", senha: "252525@Md", nome: "Maicon Daniel" };
+// ── Autenticacao via Kliniki + ACL no clinic_bridge ───────────────────────
+const API_LOGIN = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/login";
+const CLINIC_BRIDGE_PROD = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/";
+const STORAGE_TOKEN = "cavalieri_token";
+const STORAGE_USER = "cavalieri_user";
 const STORAGE_LOGIN = "cavalieri_login_ok";
 const STORAGE_LOGIN_USER = "cavalieri_login_user";
-const STORAGE_USUARIOS = "cavalieri_usuarios";
 
-const API_USUARIOS = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/usuarios";
-const GITHUB_TOKEN = "";
-const GITHUB_REPO = "mdaniel2588/cavalieri";
-const GITHUB_FILE = "usuarios.json";
-let _usuariosCarregados = false;
-
-function getUsuariosCadastrados() {
-    try {
-        const raw = window.localStorage.getItem(STORAGE_USUARIOS);
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return {};
+function getToken() {
+    return window.localStorage.getItem(STORAGE_TOKEN) || "";
 }
 
-async function carregarUsuariosRemoto() {
-    // Buscar da API centralizada (clinic_bridge → .27)
+function getUsuarioLogado() {
     try {
-        const r = await fetch(API_USUARIOS + '?t=' + Date.now());
-        if (r.ok) {
-            const resp = await r.json();
-            const usuarios = resp.usuarios || resp;
-            if (usuarios && typeof usuarios === 'object' && Object.keys(usuarios).length > 0) {
-                window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
-                _usuariosCarregados = true;
-                return;
-            }
-        }
-    } catch (e) {}
-    // Fallback: usuarios.json do GitHub
-    try {
-        const r = await fetch(GITHUB_FILE + '?t=' + Date.now());
-        if (r.ok) {
-            const usuarios = await r.json();
-            if (usuarios && typeof usuarios === 'object') {
-                const local = window.localStorage.getItem(STORAGE_USUARIOS);
-                if (!local || local === '{}') {
-                    window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
-                } else {
-                    const merged = { ...usuarios, ...JSON.parse(local) };
-                    window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(merged));
-                }
-                _usuariosCarregados = true;
-            }
-        }
-    } catch (e) {}
+        const raw = window.localStorage.getItem(STORAGE_USER);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
 }
 
-function salvarUsuarios(usuarios) {
-    window.localStorage.setItem(STORAGE_USUARIOS, JSON.stringify(usuarios));
-    // Salvar na API centralizada (clinic_bridge → .27)
-    fetch(API_USUARIOS, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(usuarios)
-    }).catch(() => {});
-    if (GITHUB_TOKEN) salvarNoGitHub(usuarios);
+function tokenValido(token) {
+    if (!token) return false;
+    const parts = token.split('.');
+    if (parts.length !== 2) return false;
+    try {
+        const payload = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+        return payload && payload.exp && payload.exp > Math.floor(Date.now() / 1000);
+    } catch (e) { return false; }
 }
 
-async function salvarNoGitHub(usuarios) {
-    try {
-        // Pegar SHA atual do arquivo
-        const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-            headers: { 'Authorization': 'token ' + GITHUB_TOKEN }
-        });
-        const info = await r.json();
-        const sha = info.sha || '';
+function clearAuth() {
+    window.localStorage.removeItem(STORAGE_TOKEN);
+    window.localStorage.removeItem(STORAGE_USER);
+    window.localStorage.removeItem(STORAGE_LOGIN);
+    window.localStorage.removeItem(STORAGE_LOGIN_USER);
+}
 
-        // Atualizar arquivo
-        await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'token ' + GITHUB_TOKEN,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: 'Atualizar usuarios',
-                content: btoa(unescape(encodeURIComponent(JSON.stringify(usuarios, null, 2)))),
-                sha: sha
-            })
-        });
-    } catch (e) {
-        console.log('Erro salvando no GitHub:', e);
+// Wrapper de fetch que injeta Authorization quando bate em /produtividade/* (exceto /login)
+window.apiFetch = async function (url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+    if (typeof url === 'string' && url.indexOf(CLINIC_BRIDGE_PROD) === 0 && url.indexOf('/login') === -1) {
+        const t = getToken();
+        if (t) options.headers['Authorization'] = 'Bearer ' + t;
     }
-}
-
-carregarUsuariosRemoto();
-
-function autenticarUsuario(login, senha) {
-    if (login === MASTER_USER.login && senha === MASTER_USER.senha) {
-        return { nome: MASTER_USER.nome, perfil: "master", acesso: ["performance", "produtividade", "usuarios"] };
+    const resp = await fetch(url, options);
+    if (resp.status === 401 && url.indexOf(CLINIC_BRIDGE_PROD) === 0) {
+        clearAuth();
+        window.location.reload();
     }
-    const usuarios = getUsuariosCadastrados();
-    const user = usuarios[login];
-    if (user && user.senha === senha) {
-        return { nome: user.nome, perfil: user.perfil || "usuario", acesso: user.acesso || ["performance"] };
-    }
-    return null;
-}
+    return resp;
+};
 
 let data = [];
 let salaFiltro = "ALL";
@@ -150,20 +98,10 @@ async function init() {
 }
 
 async function iniciarDashboard() {
-    // Identificar usuario logado
-    const loginUser = window.localStorage.getItem(STORAGE_LOGIN_USER) || "";
-    const auth = autenticarUsuario(loginUser, "");
-    // Re-auth para pegar dados (sem senha pois já logou)
-    let userAuth = null;
-    if (loginUser === MASTER_USER.login) {
-        userAuth = { nome: MASTER_USER.nome, perfil: "master", acesso: ["performance", "produtividade", "usuarios"] };
-    } else {
-        const usuarios = getUsuariosCadastrados();
-        const u = usuarios[loginUser];
-        if (u) {
-            userAuth = { nome: u.nome, perfil: u.perfil || "usuario", acesso: u.acesso || ["performance"] };
-        }
-    }
+    const u = getUsuarioLogado();
+    const userAuth = u
+        ? { nome: u.nome, perfil: u.perfil, acesso: u.acessos || ["performance"] }
+        : null;
 
     // Mostrar nome
     const nomeLogado = document.getElementById("nomeLogado");
@@ -182,10 +120,10 @@ async function iniciarDashboard() {
         initProdutividade();
     }
 
-    // Painel de usuarios (master)
-    if (userAuth && userAuth.perfil === "master") {
-        initPainelUsuarios();
-    }
+    // Painel de usuarios (master) — desativado: ACL gerenciado direto no servidor
+    // if (userAuth && userAuth.acesso && userAuth.acesso.includes("usuarios")) {
+    //     initPainelUsuarios();
+    // }
 
     preencherMeses();
     preencherAnos();
@@ -244,25 +182,38 @@ function bindLogin() {
 
         const usuario = elements.loginUsuario.value.trim();
         const senha = elements.loginSenha.value;
+        const erroEl = elements.loginErro;
 
-        const auth = autenticarUsuario(usuario, senha);
-        if (!auth) {
-            elements.loginErro.hidden = false;
-            return;
+        try {
+            const r = await fetch(API_LOGIN, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuario, senha })
+            });
+            const data = await r.json();
+            if (!r.ok || !data.ok) {
+                erroEl.textContent = data && data.erro ? data.erro : 'Usuario ou senha invalidos.';
+                erroEl.hidden = false;
+                return;
+            }
+            window.localStorage.setItem(STORAGE_TOKEN, data.token);
+            window.localStorage.setItem(STORAGE_USER, JSON.stringify(data.usuario));
+            window.localStorage.setItem(STORAGE_LOGIN, "1");
+            window.localStorage.setItem(STORAGE_LOGIN_USER, data.usuario.login);
+            erroEl.hidden = true;
+            liberarDashboard();
+            await iniciarDashboard();
+        } catch (e) {
+            erroEl.textContent = 'Erro de conexao com o servidor.';
+            erroEl.hidden = false;
         }
-
-        elements.loginErro.hidden = true;
-        window.localStorage.setItem(STORAGE_LOGIN, "1");
-        window.localStorage.setItem(STORAGE_LOGIN_USER, usuario);
-        liberarDashboard();
-        await iniciarDashboard();
     });
 
     elements.logoutButton.addEventListener("click", sair);
 }
 
 function validarSessaoLogin() {
-    return window.localStorage.getItem(STORAGE_LOGIN) === "1";
+    return tokenValido(getToken()) && !!getUsuarioLogado();
 }
 
 function bloquearDashboard() {
@@ -274,8 +225,7 @@ function liberarDashboard() {
 }
 
 function sair() {
-    window.localStorage.removeItem(STORAGE_LOGIN);
-    window.localStorage.removeItem(STORAGE_LOGIN_USER);
+    clearAuth();
     window.location.reload();
 }
 
