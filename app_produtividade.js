@@ -105,10 +105,18 @@ function _fmtDPFull(d) { return _fmtDP(d)+"/"+d.getFullYear(); }
 function _sameDayP(a,b) { return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
 function _toISO(d) { return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
+function _periodoLabel() {
+    const nomeMes = _meses[_pcalMes + 1];
+    if (_pcalQuick === "trimestre") return (Math.floor(_pcalMes/3)+1) + "º Tri " + _pcalAno;
+    if (_pcalQuick === "semestral") return (Math.floor(_pcalMes/6)+1) + "º Sem " + _pcalAno;
+    if (_pcalQuick === "anual") return "Ano " + _pcalAno;
+    return nomeMes + " " + _pcalAno;
+}
+
 function _renderCalProd() {
     const box = document.getElementById("calendarPickerProd");
     if (!box) return;
-    const nomeMes = _meses[_pcalMes + 1]; const h = new Date();
+    const h = new Date();
     let rangeIni = _pcalSelA, rangeFim = _pcalSelA;
     if (_pcalSelA && _pcalSelB) {
         rangeIni = _pcalSelB < _pcalSelA ? _pcalSelB : _pcalSelA;
@@ -120,7 +128,7 @@ function _renderCalProd() {
 
     let html = '<div class="cal-header">';
     html += '<button class="cal-arrow" id="pcalPrev" type="button">&#9664;</button>';
-    html += '<span class="cal-month-label" id="pcalLabel">' + nomeMes + " " + _pcalAno + '</span>';
+    html += '<span class="cal-month-label" id="pcalLabel">' + _periodoLabel() + '</span>';
     html += '<button class="cal-arrow" id="pcalNext" type="button">&#9654;</button>';
     if (textoSel && !_pcalExpanded) html += '<span style="margin-left:10px;font-size:11px;color:#96b7ff;font-weight:600;">' + textoSel + '</span>';
     html += '</div>';
@@ -170,16 +178,50 @@ function _renderCalProd() {
     box.querySelectorAll(".cal-qbtn").forEach(btn => btn.addEventListener("click", () => _handleProdQuick(btn.dataset.quick)));
 }
 
+function _navegarPeriodo(direcao) {
+    // direcao: -1 = anterior, +1 = proximo
+    if (_pcalQuick === "anual") {
+        _pcalAno += direcao;
+        _pcalMes = 0;
+        _pcalSelA = new Date(_pcalAno, 0, 1);
+        _pcalSelB = new Date(_pcalAno, 11, 31);
+    } else if (_pcalQuick === "semestral") {
+        const semIdx = Math.floor(_pcalMes/6) + direcao;
+        if (semIdx < 0) { _pcalAno--; _pcalMes = 6; }
+        else if (semIdx > 1) { _pcalAno++; _pcalMes = 0; }
+        else { _pcalMes = semIdx * 6; }
+        _pcalSelA = new Date(_pcalAno, _pcalMes, 1);
+        _pcalSelB = new Date(_pcalAno, _pcalMes+6, 0);
+    } else if (_pcalQuick === "trimestre") {
+        const triIdx = Math.floor(_pcalMes/3) + direcao;
+        if (triIdx < 0) { _pcalAno--; _pcalMes = 9; }
+        else if (triIdx > 3) { _pcalAno++; _pcalMes = 0; }
+        else { _pcalMes = triIdx * 3; }
+        _pcalSelA = new Date(_pcalAno, _pcalMes, 1);
+        _pcalSelB = new Date(_pcalAno, _pcalMes+3, 0);
+    } else {
+        // Padrao: navega por mes, e se estava com quick != mes, vira "mes" so se NAO estiver expandido
+        _pcalMes += direcao;
+        if (_pcalMes < 0) { _pcalMes = 11; _pcalAno--; }
+        if (_pcalMes > 11) { _pcalMes = 0; _pcalAno++; }
+        if (!_pcalExpanded) {
+            _pcalQuick = "mes";
+            _pcalSelA = new Date(_pcalAno, _pcalMes, 1);
+            _pcalSelB = new Date(_pcalAno, _pcalMes+1, 0);
+        }
+    }
+}
+
 function _bindCalProdHeader(box) {
     const prev = document.getElementById("pcalPrev"), next = document.getElementById("pcalNext"), label = document.getElementById("pcalLabel");
     if (prev) prev.addEventListener("click", () => {
-        _pcalMes--; if (_pcalMes<0){_pcalMes=11;_pcalAno--;}
-        if (!_pcalExpanded) { _pcalQuick=""; _pcalSelA=new Date(_pcalAno,_pcalMes,1); _pcalSelB=new Date(_pcalAno,_pcalMes+1,0); _applyCalProd(); carregarProd(); }
+        _navegarPeriodo(-1);
+        if (!_pcalExpanded) { _applyCalProd(); carregarProd(); }
         _renderCalProd();
     });
     if (next) next.addEventListener("click", () => {
-        _pcalMes++; if (_pcalMes>11){_pcalMes=0;_pcalAno++;}
-        if (!_pcalExpanded) { _pcalQuick=""; _pcalSelA=new Date(_pcalAno,_pcalMes,1); _pcalSelB=new Date(_pcalAno,_pcalMes+1,0); _applyCalProd(); carregarProd(); }
+        _navegarPeriodo(+1);
+        if (!_pcalExpanded) { _applyCalProd(); carregarProd(); }
         _renderCalProd();
     });
     if (label) label.addEventListener("click", () => { _pcalExpanded = !_pcalExpanded; _renderCalProd(); });
@@ -426,13 +468,16 @@ function renderMarcacao(marc, octaMap) {
     if (octaClassificado?.totais || cTotal > 0) {
         const t = octaClassificado?.totais || {};
         const total = t.atend_real || 1;
+        // Reclamacoes: contar so as confirmadas pela IA + as ainda nao analisadas (excluir false-positives)
+        const reclList = (octaClassificado?.detalhes?.reclamacao || []);
+        const reclReais = reclList.filter(r => r.confirmada !== false).length;
         const cats = [
             {label:'Via WhatsApp',val:cWpp,color:'#25d366',bg:'rgba(37,211,102,0.12)',key:'marcacao',base:cTotal,showPct:true},
             {label:'Via Telefone',val:cTel+cHib,color:'#3a86ff',bg:'rgba(58,134,255,0.12)',key:null,base:cTotal,showPct:true},
             {label:'Ag. Direto',val:cDir,color:'#9b59b6',bg:'rgba(155,89,182,0.12)',key:null,base:cTotal,showPct:true},
             {label:'Confirmaram',val:t.confirmacao,color:'#2ecc71',bg:'rgba(46,204,113,0.12)',key:null,base:total},
             {label:'Cancelaram',val:t.cancelamento,color:'#e74c3c',bg:'rgba(231,76,60,0.12)',key:'cancelamento',base:total},
-            {label:'Reclamação',val:t.reclamacao,color:'#ff5252',bg:'rgba(255,82,82,0.12)',key:'reclamacao',base:total},
+            {label:'Reclamação',val:reclReais,color:'#ff5252',bg:'rgba(255,82,82,0.12)',key:'reclamacao',base:total},
             {label:'Pediram Info',val:t.informacao,color:'#f39c12',bg:'rgba(243,156,18,0.12)',key:null,base:total},
             {label:'Resultado/Laudo',val:t.resultado,color:'#9b59b6',bg:'rgba(155,89,182,0.08)',key:'resultado',base:total},
         ];
@@ -464,7 +509,9 @@ function renderMarcacao(marc, octaMap) {
 
         // Painéis drill-down
         if (octaClassificado?.detalhes) {
-            for (const [key, items] of Object.entries(octaClassificado.detalhes)) {
+            for (const [key, itemsRaw] of Object.entries(octaClassificado.detalhes)) {
+                // Reclamacoes: ocultar as confirmada=false (IA descartou como falso positivo)
+                const items = key === 'reclamacao' ? itemsRaw.filter(it => it.confirmada !== false) : itemsRaw;
                 const labelMap = {reclamacao:'Reclamações',cancelamento:'Cancelamentos',marcacao:'Marcações WhatsApp',resultado:'Resultado/Laudo'};
                 h += `<div id="detalhe_${key}" style="display:none;margin-top:10px;background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto;">`;
                 h += `<div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:8px;">${labelMap[key]||key} — ${items.length} registros</div>`;
@@ -580,8 +627,26 @@ let chartHistMarc = null;
 let chartHistPV = null;
 let chartHistCaptacao = null;
 
+function _mesesSugeridosPeriodo() {
+    if (_pcalQuick === "anual") return 24;
+    if (_pcalQuick === "semestral") return 12;
+    if (_pcalQuick === "trimestre") return 6;
+    if (_pcalQuick === "mes" || _pcalQuick === "semana" || _pcalQuick === "hoje") return 12;
+    // Custom range: conta meses entre A e B
+    if (_pcalSelA && _pcalSelB) {
+        const a = _pcalSelA, b = _pcalSelB;
+        const diff = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth()) + 1;
+        return Math.max(3, Math.min(36, diff));
+    }
+    return 12;
+}
+
 async function carregarComparativos() {
-    const meses = parseInt(document.getElementById("compMeses").value, 10) || 12;
+    const sel = document.getElementById("compMeses");
+    // Sincroniza dropdown com periodo do topo (caso valor sugerido seja uma das opcoes)
+    const sug = _mesesSugeridosPeriodo();
+    if (sel && [6,12,24].includes(sug)) sel.value = String(sug);
+    const meses = parseInt(sel ? sel.value : 12, 10) || 12;
     const status = document.getElementById("compStatus");
     if (status) status.textContent = "Carregando...";
     try {
