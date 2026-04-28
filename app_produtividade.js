@@ -626,90 +626,126 @@ function toggleDetalhe(key) {
 
 // ── Timeline ──
 const API_TIMELINE = API_BASE + "/timeline";
-const API_HISTORICO = API_BASE + "/historico";
+const API_COMPARATIVO = "https://192.168.0.27:8443/api/produtividade/comparativo";
 
-let chartHistMarc = null;
-let chartHistPV = null;
-let chartHistCaptacao = null;
+let chartCompCanal = null;
+let chartCompPipeline = null;
+let chartCompTaxas = null;
 
 async function carregarComparativos() {
-    let qs = "meses=12";
+    // Range: usa _pcalSelA/B se tiver, senão últimos 30 dias
+    let di, df;
     if (_pcalSelA && _pcalSelB) {
         const a = _pcalSelA, b = _pcalSelB;
-        const di = _toISO(a < b ? a : b);
-        const df = _toISO(a < b ? b : a);
-        qs = `data_inicio=${di}&data_fim=${df}`;
+        di = _toISO(a < b ? a : b);
+        df = _toISO(a < b ? b : a);
+    } else {
+        const h = new Date();
+        const ini = new Date(h.getFullYear(), h.getMonth()-1, h.getDate());
+        di = _toISO(ini); df = _toISO(h);
     }
+
     try {
-        const r = await window.apiFetch(`${API_HISTORICO}?${qs}`);
+        const r = await fetch(`${API_COMPARATIVO}?data_inicio=${di}&data_fim=${df}`);
         const j = await r.json();
-        if (!j.ok) throw new Error(j.erro || "Erro");
-        renderComparativos(j.data);
+        if (!j.ok) throw new Error(j.error || j.erro || "Erro");
+        renderComparativos(j);
     } catch (e) {
         console.warn("Comparativos:", e);
     }
 }
 
 function renderComparativos(data) {
-    const labels = data.serie.map(s => s.label);
-    const marc = data.serie.map(s => s.marcacoes);
-    const pv = data.serie.map(s => s.pacientes_primeira_vez);
-    const cap = data.serie.map(s => s.marcacoes > 0 ? Math.round(s.pacientes_primeira_vez / s.marcacoes * 1000) / 10 : 0);
+    const serie = data.serie || [];
+    const labels = serie.map(s => s.label);
+    const tel = serie.map(s => s.tel);
+    const wpp = serie.map(s => s.wpp);
+    const atend = serie.map(s => s.atendimentos);
+    const marc = serie.map(s => s.marcacoes);
+    const pac = serie.map(s => s.pacientes_novos);
+    const txMarc = serie.map(s => s.tx_marcacao);
+    const txCapt = serie.map(s => s.tx_captacao);
 
     const baseScales = (extra = {}) => ({
         x: { ticks: { color: "#96b7ff" }, grid: { display: false } },
-        y: Object.assign({ ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" }, beginAtZero: true, grace: "12%" }, extra)
+        y: Object.assign({ ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" }, beginAtZero: true, grace: "15%" }, extra)
     });
     const baseLayout = { padding: { top: 18 } };
 
-    if (chartHistMarc) chartHistMarc.destroy();
-    chartHistMarc = new Chart(document.getElementById("chartHistMarc"), {
+    // Chart 1: Atendimentos por canal (stacked bars)
+    if (chartCompCanal) chartCompCanal.destroy();
+    chartCompCanal = new Chart(document.getElementById("chartCompCanal"), {
         type: "bar",
-        data: { labels, datasets: [{ label: "Marcações", data: marc, backgroundColor: "#4cc9f0", borderRadius: 4 }] },
+        data: {
+            labels,
+            datasets: [
+                { label: "Telefone", data: tel, backgroundColor: "#3a86ff", borderRadius: 4, stack: "atend" },
+                { label: "WhatsApp", data: wpp, backgroundColor: "#25d366", borderRadius: 4, stack: "atend" }
+            ]
+        },
         options: {
-            plugins: { legend: { display: false }, datalabels: { color: "#fff", anchor: "end", align: "top", font: { size: 10 } } },
-            scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
+            plugins: {
+                legend: { labels: { color: "#c4dbff", font: { size: 11 } }, position: "top" },
+                datalabels: { display: false }
+            },
+            scales: { x: { stacked: true, ticks: { color: "#96b7ff" }, grid: { display: false } },
+                      y: { stacked: true, ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" }, beginAtZero: true, grace: "10%" } },
+            layout: baseLayout, maintainAspectRatio: false
         }
     });
 
-    if (chartHistPV) chartHistPV.destroy();
-    chartHistPV = new Chart(document.getElementById("chartHistPV"), {
-        type: "bar",
-        data: { labels, datasets: [{ label: "Pacientes 1ª vez", data: pv, backgroundColor: "#2ecc71", borderRadius: 4 }] },
-        options: {
-            plugins: { legend: { display: false }, datalabels: { color: "#fff", anchor: "end", align: "top", font: { size: 10 } } },
-            scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
-        }
-    });
-
-    if (chartHistCaptacao) chartHistCaptacao.destroy();
-    chartHistCaptacao = new Chart(document.getElementById("chartHistCaptacao"), {
+    // Chart 2: Pipeline (3 lines)
+    if (chartCompPipeline) chartCompPipeline.destroy();
+    chartCompPipeline = new Chart(document.getElementById("chartCompPipeline"), {
         type: "line",
-        data: { labels, datasets: [{ label: "% captação", data: cap, borderColor: "#f2c94c", backgroundColor: "rgba(242,201,76,0.15)", fill: true, tension: 0.3, pointRadius: 4 }] },
+        data: {
+            labels,
+            datasets: [
+                { label: "Atendimentos", data: atend, borderColor: "#4cc9f0", backgroundColor: "rgba(76,201,240,0.10)", fill: true, tension: 0.25, pointRadius: 3, borderWidth: 2 },
+                { label: "Marcações", data: marc, borderColor: "#f2c94c", backgroundColor: "rgba(242,201,76,0.10)", fill: false, tension: 0.25, pointRadius: 3, borderWidth: 2 },
+                { label: "Pacientes novos", data: pac, borderColor: "#2ecc71", backgroundColor: "rgba(46,204,113,0.10)", fill: false, tension: 0.25, pointRadius: 3, borderWidth: 2 }
+            ]
+        },
         options: {
-            plugins: { legend: { display: false }, datalabels: { color: "#f2c94c", anchor: "end", align: "top", font: { size: 10, weight: 600 }, formatter: v => v + "%" } },
+            plugins: {
+                legend: { labels: { color: "#c4dbff", font: { size: 11 } }, position: "top" },
+                datalabels: { display: false }
+            },
+            scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
+        }
+    });
+
+    // Chart 3: Taxas
+    if (chartCompTaxas) chartCompTaxas.destroy();
+    chartCompTaxas = new Chart(document.getElementById("chartCompTaxas"), {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "% atend → marcação", data: txMarc, borderColor: "#f2c94c", backgroundColor: "rgba(242,201,76,0.12)", fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2 },
+                { label: "% atend → paciente novo", data: txCapt, borderColor: "#2ecc71", backgroundColor: "rgba(46,204,113,0.12)", fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2 }
+            ]
+        },
+        options: {
+            plugins: {
+                legend: { labels: { color: "#c4dbff", font: { size: 11 } }, position: "top" },
+                datalabels: { display: false }
+            },
             scales: baseScales({ ticks: { color: "#96b7ff", callback: v => v + "%" } }), layout: baseLayout, maintainAspectRatio: false
         }
     });
 
-    const totMarc = marc.reduce((a, b) => a + b, 0);
-    const totPV = pv.reduce((a, b) => a + b, 0);
-    const capMedia = totMarc > 0 ? (totPV / totMarc * 100).toFixed(1) : 0;
-    const ult = data.serie[data.serie.length - 1] || {};
-    const ant = data.serie[data.serie.length - 2] || {};
-    const trendMarc = ant.marcacoes > 0 ? Math.round((ult.marcacoes - ant.marcacoes) / ant.marcacoes * 100) : 0;
-    const trendPV = ant.pacientes_primeira_vez > 0 ? Math.round((ult.pacientes_primeira_vez - ant.pacientes_primeira_vez) / ant.pacientes_primeira_vez * 100) : 0;
-
-    const colorTrend = v => v >= 0 ? "#2ecc71" : "#e94560";
-    const arrow = v => v >= 0 ? "▲" : "▼";
-
+    // Resumo
+    const t = data.totais || {};
+    const granLabel = { dia: "dia a dia", semana: "por semana", mes: "mês a mês" }[data.granularidade] || data.granularidade;
     document.getElementById("compResumo").innerHTML = `
-        <div style="display:flex;gap:20px;flex-wrap:wrap;">
-            <div><b style="color:#4cc9f0;">Total marcações:</b> ${totMarc.toLocaleString("pt-BR")}</div>
-            <div><b style="color:#2ecc71;">Total pacientes 1ª vez:</b> ${totPV.toLocaleString("pt-BR")}</div>
-            <div><b style="color:#f2c94c;">Captação média:</b> ${capMedia}%</div>
-            <div>Último mês vs anterior — Marc.: <span style="color:${colorTrend(trendMarc)};font-weight:600;">${arrow(trendMarc)} ${Math.abs(trendMarc)}%</span></div>
-            <div>Pac. novos: <span style="color:${colorTrend(trendPV)};font-weight:600;">${arrow(trendPV)} ${Math.abs(trendPV)}%</span></div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+            <div style="font-size:11px;color:#96b7ff;">Granularidade: <b style="color:#c4dbff;">${granLabel}</b> (${serie.length} ${serie.length>1?'pontos':'ponto'})</div>
+            <div><b style="color:#3a86ff;">Tel:</b> ${(t.tel||0).toLocaleString("pt-BR")}</div>
+            <div><b style="color:#25d366;">WPP:</b> ${(t.wpp||0).toLocaleString("pt-BR")}</div>
+            <div><b style="color:#4cc9f0;">Atendimentos:</b> ${(t.atendimentos||0).toLocaleString("pt-BR")}</div>
+            <div><b style="color:#f2c94c;">Marcações:</b> ${(t.marcacoes||0).toLocaleString("pt-BR")} <span style="color:#666;">(${t.tx_marcacao||0}%)</span></div>
+            <div><b style="color:#2ecc71;">Pacientes novos:</b> ${(t.pacientes_novos||0).toLocaleString("pt-BR")} <span style="color:#666;">(${t.tx_captacao||0}%)</span></div>
         </div>
     `;
 }

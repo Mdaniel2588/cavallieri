@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260428e">
+    <link rel="stylesheet" href="styles.css?v=20260428f">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260428e"></script>
-    <script defer src="app_produtividade.js?v=20260428e"></script>
+    <script defer src="app.js?v=20260428f"></script>
+    <script defer src="app_produtividade.js?v=20260428f"></script>
     <style>
     /* Calendario inline */
     .cal-wrapper{user-select:none;}
@@ -192,18 +192,18 @@
 
         <!-- Painel Comparativos -->
         <div class="prod-table-wrapper" id="panelComparativos" style="display:none;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px;">
                 <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;">
-                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Marcações Kliniki por mês</div>
-                    <canvas id="chartHistMarc" style="max-height:260px;"></canvas>
+                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Atendimentos por canal (Telefone + WhatsApp)</div>
+                    <canvas id="chartCompCanal" style="max-height:280px;"></canvas>
                 </div>
                 <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;">
-                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Pacientes 1ª vez por mês</div>
-                    <canvas id="chartHistPV" style="max-height:260px;"></canvas>
+                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Pipeline: Atendimentos → Marcações → Pacientes novos</div>
+                    <canvas id="chartCompPipeline" style="max-height:280px;"></canvas>
                 </div>
-                <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;grid-column:1/-1;">
-                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Captação: % de marcações que viraram paciente novo</div>
-                    <canvas id="chartHistCaptacao" style="max-height:260px;"></canvas>
+                <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;">
+                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Taxas: % atendimento → marcação | % atendimento → paciente novo</div>
+                    <canvas id="chartCompTaxas" style="max-height:280px;"></canvas>
                 </div>
             </div>
             <div id="compResumo" style="margin-top:12px;padding:10px;background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;color:#c4dbff;font-size:13px;"></div>
