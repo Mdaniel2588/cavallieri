@@ -9,7 +9,8 @@ const OCTA_MAP = {
     "Rosangela Alcantara Lima":"RAL","Rosangela Tavares":"RDT","Vanessa Waeger":"VS",
     "Jane Sousa":"JSL","Gessica Oliveira":"GOS","Rose Martins":"RGM",
     "Claudia Barbosa":"DUDU","Diana Anchieta":"DC","Nelia de Abreu Silva":"RAS",
-    "Cristialine Silva":"CJS","Renata Aquino":"RAC","Dayane":"DSR"
+    "Cristialine Silva":"CJS","Renata Aquino":"RAC","Dayane":"DSR",
+    "Karina Cristina Carvalho":"KCC","Rubens Oliver":"RJO"
 };
 
 // Excluir do ranking (sistema/bloqueio)
@@ -183,6 +184,7 @@ function _navegarPeriodo(direcao) {
         _pcalMes = 0;
         _pcalSelA = new Date(_pcalAno, 0, 1);
         _pcalSelB = new Date(_pcalAno, 11, 31);
+        prodPeriodo = "anual";
     } else if (_pcalQuick === "semestral") {
         const semIdx = Math.floor(_pcalMes/6) + direcao;
         if (semIdx < 0) { _pcalAno--; _pcalMes = 6; }
@@ -190,6 +192,7 @@ function _navegarPeriodo(direcao) {
         else { _pcalMes = semIdx * 6; }
         _pcalSelA = new Date(_pcalAno, _pcalMes, 1);
         _pcalSelB = new Date(_pcalAno, _pcalMes+6, 0);
+        prodPeriodo = "semestral";
     } else if (_pcalQuick === "trimestre") {
         const triIdx = Math.floor(_pcalMes/3) + direcao;
         if (triIdx < 0) { _pcalAno--; _pcalMes = 9; }
@@ -197,6 +200,7 @@ function _navegarPeriodo(direcao) {
         else { _pcalMes = triIdx * 3; }
         _pcalSelA = new Date(_pcalAno, _pcalMes, 1);
         _pcalSelB = new Date(_pcalAno, _pcalMes+3, 0);
+        prodPeriodo = "trimestre";
     } else {
         // Padrao: navega por mes, e se estava com quick != mes, vira "mes" so se NAO estiver expandido
         _pcalMes += direcao;
@@ -206,6 +210,7 @@ function _navegarPeriodo(direcao) {
             _pcalQuick = "mes";
             _pcalSelA = new Date(_pcalAno, _pcalMes, 1);
             _pcalSelB = new Date(_pcalAno, _pcalMes+1, 0);
+            prodPeriodo = "mes";
         }
     }
 }
@@ -628,10 +633,6 @@ let chartHistPV = null;
 let chartHistCaptacao = null;
 
 async function carregarComparativos() {
-    const status = document.getElementById("compStatus");
-    if (status) status.textContent = "Carregando...";
-
-    // Decide range: prefere _pcalSelA/_pcalSelB; fallback ultimos 12 meses
     let qs = "meses=12";
     if (_pcalSelA && _pcalSelB) {
         const a = _pcalSelA, b = _pcalSelB;
@@ -639,15 +640,13 @@ async function carregarComparativos() {
         const df = _toISO(a < b ? b : a);
         qs = `data_inicio=${di}&data_fim=${df}`;
     }
-
     try {
         const r = await window.apiFetch(`${API_HISTORICO}?${qs}`);
         const j = await r.json();
         if (!j.ok) throw new Error(j.erro || "Erro");
         renderComparativos(j.data);
-        if (status) status.textContent = `${j.data.serie.length} mes${j.data.serie.length>1?'es':''} (${j.data.inicio} → ${j.data.fim}) — segue o filtro do topo`;
     } catch (e) {
-        if (status) status.textContent = "Erro: " + e.message;
+        console.warn("Comparativos:", e);
     }
 }
 
