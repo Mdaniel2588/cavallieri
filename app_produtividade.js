@@ -434,7 +434,7 @@ function renderMarcacao(marc, octaMap) {
         const enC = pl === 0 ? '#555' : pl <= 20 ? '#2ecc71' : pl <= 30 ? '#f39c12' : '#e94560';
         const cvC = te === 0 ? '#555' : te >= 20 ? '#2ecc71' : te >= 12 ? '#3498db' : te >= 8 ? '#f39c12' : '#e94560';
         h+=`<tr><td class="rank-cell">${p++}</td>
-            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td>
+            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'}</td>
             <td class="num-cell">${u.ligacoes||'-'}</td><td class="num-cell" style="color:#888;">${fmt(u.tempo_medio_lig)}</td>
             <td class="num-cell">${u.wpp||'-'}</td><td class="num-cell" style="color:#888;">${tMedWpp}</td>
             <td class="num-cell total-cell">${u.atendimentos||'-'}</td>
@@ -449,7 +449,7 @@ function renderMarcacao(marc, octaMap) {
     if (diretos.length) {
         for (const u of diretos) {
             h+=`<tr style="background:rgba(155,89,182,0.08);"><td></td>
-                <td style="font-weight:bold;color:#9b59b6;">${u.usuario}</td><td style="text-align:left;color:#9b59b6;">${u.nome||'-'} <span style="font-size:10px;">(Ag.Direto)</span></td>
+                <td style="font-weight:bold;color:#9b59b6;">${u.usuario}</td><td style="text-align:left;color:#9b59b6;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'} <span style="font-size:10px;">(Ag.Direto)</span></td>
                 <td colspan="6"></td><td class="num-cell" style="color:#9b59b6;font-weight:600;">${u.marcacoes||0}</td>
                 <td colspan="3"></td><td></td></tr>`;
         }
@@ -567,7 +567,7 @@ function renderRecepcao(recep) {
     const lista = recep.filter(u => !isOc(u.usuario) && (u.admissoes||0)>0).sort((a,b)=>(b.admissoes||0)-(a.admissoes||0));
     let h = `<table class="prod-table"><thead><tr><th>#</th><th>Sigla</th><th>Nome</th><th>Admissões</th><th></th></tr></thead><tbody>`;
     let p=1;
-    for(const u of lista) h+=`<tr><td class="rank-cell">${p++}</td><td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||'-'}</td><td class="num-cell total-cell">${u.admissoes||0}</td><td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')">×</button></td></tr>`;
+    for(const u of lista) h+=`<tr><td class="rank-cell">${p++}</td><td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'}</td><td class="num-cell total-cell">${u.admissoes||0}</td><td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')">×</button></td></tr>`;
     const tA=lista.reduce((s,u)=>s+(u.admissoes||0),0);
     h+=`<tr class="total-row"><td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td><td class="num-cell total-cell" style="font-size:14px;">${tA}</td><td></td></tr></tbody></table>`;
     el.panelRecep.innerHTML = h;
