@@ -453,10 +453,30 @@ function renderMarcacao(marc, octaMap) {
                 const labelMap = {reclamacao:'Reclamações',cancelamento:'Cancelamentos',marcacao:'Marcações WhatsApp',resultado:'Resultado/Laudo'};
                 h += `<div id="detalhe_${key}" style="display:none;margin-top:10px;background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto;">`;
                 h += `<div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:8px;">${labelMap[key]||key} — ${items.length} registros</div>`;
-                h += `<table class="prod-table prod-table-sm"><thead><tr><th>Data</th><th>Paciente</th><th>Telefone</th><th>Agente</th></tr></thead><tbody>`;
+                const isReclam = key === 'reclamacao';
+                const extraHead = isReclam ? '<th>Categoria</th><th style="text-align:left;">Resumo IA</th>' : '';
+                h += `<table class="prod-table prod-table-sm"><thead><tr><th>Data</th><th>Paciente</th><th>Telefone</th><th>Agente</th>${extraHead}</tr></thead><tbody>`;
                 for (const it of items) {
                     const dataFmt = it.data ? it.data.substring(5,16).replace('-','/') : '-';
-                    h += `<tr><td class="num-cell">${dataFmt}</td><td style="text-align:left;">${it.nome||'-'}</td><td class="num-cell">${it.telefone||'-'}</td><td>${it.agente||'-'}</td></tr>`;
+                    let extraCols = '';
+                    let rowStyle = '';
+                    if (isReclam) {
+                        const sub = it.sub_categoria || '';
+                        const conf = it.confirmada;
+                        const resumo = it.resumo || '';
+                        if (conf === false) {
+                            // falso positivo
+                            rowStyle = ' style="opacity:0.45;"';
+                            extraCols = `<td><span style="color:#888;">não conf.</span></td><td style="text-align:left;color:#888;font-style:italic;">${resumo || '(sem reclamação real)'}</td>`;
+                        } else if (conf === true) {
+                            const subColor = {preco:'#f2c94c',horario:'#f39c12',atendimento:'#e94560',laudo:'#9b59b6',exame:'#3498db',outros:'#95a5a6'}[sub] || '#96b7ff';
+                            extraCols = `<td><span style="color:${subColor};font-weight:600;">${sub||'-'}</span></td><td style="text-align:left;">${resumo||'-'}</td>`;
+                        } else {
+                            // ainda nao analisada
+                            extraCols = `<td><span style="color:#666;">⌛</span></td><td style="text-align:left;color:#666;">analisando...</td>`;
+                        }
+                    }
+                    h += `<tr${rowStyle}><td class="num-cell">${dataFmt}</td><td style="text-align:left;">${it.nome||'-'}</td><td class="num-cell">${it.telefone||'-'}</td><td>${it.agente||'-'}</td>${extraCols}</tr>`;
                 }
                 h += `</tbody></table></div>`;
             }
