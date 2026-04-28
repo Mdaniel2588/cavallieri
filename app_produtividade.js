@@ -88,8 +88,6 @@ function initProdutividade() {
     el.tabRecep.addEventListener("click", () => setTab("recep"));
     el.tabComparativos.addEventListener("click", () => setTab("comparativos"));
     el.tabTimeline.addEventListener("click", () => setTab("timeline"));
-    const sel = document.getElementById("compMeses");
-    if (sel) sel.addEventListener("change", () => carregarComparativos());
     el.timelineData.value = new Date().toISOString().slice(0,10);
     el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
 
@@ -299,6 +297,8 @@ async function carregarProd() {
 
         renderProd(); hideSt();
         if(prodPeriodo==="hoje"){showSt("Realtime — atualiza a cada 2 min","info");setTimeout(hideSt,4000);}
+        // Se tab Comparativos esta visivel, recarrega gráficos com novo periodo
+        if (currentTab === "comparativos") carregarComparativos();
 
         // Tempo médio WPP: buscar do com_octa=1 em background (não bloqueia)
         const tmUrl = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_octa=1${dateParams}`;
@@ -627,34 +627,25 @@ let chartHistMarc = null;
 let chartHistPV = null;
 let chartHistCaptacao = null;
 
-function _mesesSugeridosPeriodo() {
-    if (_pcalQuick === "anual") return 24;
-    if (_pcalQuick === "semestral") return 12;
-    if (_pcalQuick === "trimestre") return 6;
-    if (_pcalQuick === "mes" || _pcalQuick === "semana" || _pcalQuick === "hoje") return 12;
-    // Custom range: conta meses entre A e B
-    if (_pcalSelA && _pcalSelB) {
-        const a = _pcalSelA, b = _pcalSelB;
-        const diff = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth()) + 1;
-        return Math.max(3, Math.min(36, diff));
-    }
-    return 12;
-}
-
 async function carregarComparativos() {
-    const sel = document.getElementById("compMeses");
-    // Sincroniza dropdown com periodo do topo (caso valor sugerido seja uma das opcoes)
-    const sug = _mesesSugeridosPeriodo();
-    if (sel && [6,12,24].includes(sug)) sel.value = String(sug);
-    const meses = parseInt(sel ? sel.value : 12, 10) || 12;
     const status = document.getElementById("compStatus");
     if (status) status.textContent = "Carregando...";
+
+    // Decide range: prefere _pcalSelA/_pcalSelB; fallback ultimos 12 meses
+    let qs = "meses=12";
+    if (_pcalSelA && _pcalSelB) {
+        const a = _pcalSelA, b = _pcalSelB;
+        const di = _toISO(a < b ? a : b);
+        const df = _toISO(a < b ? b : a);
+        qs = `data_inicio=${di}&data_fim=${df}`;
+    }
+
     try {
-        const r = await window.apiFetch(`${API_HISTORICO}?meses=${meses}`);
+        const r = await window.apiFetch(`${API_HISTORICO}?${qs}`);
         const j = await r.json();
         if (!j.ok) throw new Error(j.erro || "Erro");
         renderComparativos(j.data);
-        if (status) status.textContent = `${j.data.serie.length} meses (${j.data.inicio} → ${j.data.fim})`;
+        if (status) status.textContent = `${j.data.serie.length} mes${j.data.serie.length>1?'es':''} (${j.data.inicio} → ${j.data.fim}) — segue o filtro do topo`;
     } catch (e) {
         if (status) status.textContent = "Erro: " + e.message;
     }
@@ -666,14 +657,19 @@ function renderComparativos(data) {
     const pv = data.serie.map(s => s.pacientes_primeira_vez);
     const cap = data.serie.map(s => s.marcacoes > 0 ? Math.round(s.pacientes_primeira_vez / s.marcacoes * 1000) / 10 : 0);
 
+    const baseScales = (extra = {}) => ({
+        x: { ticks: { color: "#96b7ff" }, grid: { display: false } },
+        y: Object.assign({ ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" }, beginAtZero: true, grace: "12%" }, extra)
+    });
+    const baseLayout = { padding: { top: 18 } };
+
     if (chartHistMarc) chartHistMarc.destroy();
     chartHistMarc = new Chart(document.getElementById("chartHistMarc"), {
         type: "bar",
         data: { labels, datasets: [{ label: "Marcações", data: marc, backgroundColor: "#4cc9f0", borderRadius: 4 }] },
         options: {
             plugins: { legend: { display: false }, datalabels: { color: "#fff", anchor: "end", align: "top", font: { size: 10 } } },
-            scales: { x: { ticks: { color: "#96b7ff" }, grid: { display: false } }, y: { ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" } } },
-            maintainAspectRatio: false
+            scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
         }
     });
 
@@ -683,8 +679,7 @@ function renderComparativos(data) {
         data: { labels, datasets: [{ label: "Pacientes 1ª vez", data: pv, backgroundColor: "#2ecc71", borderRadius: 4 }] },
         options: {
             plugins: { legend: { display: false }, datalabels: { color: "#fff", anchor: "end", align: "top", font: { size: 10 } } },
-            scales: { x: { ticks: { color: "#96b7ff" }, grid: { display: false } }, y: { ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" } } },
-            maintainAspectRatio: false
+            scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
         }
     });
 
@@ -694,8 +689,7 @@ function renderComparativos(data) {
         data: { labels, datasets: [{ label: "% captação", data: cap, borderColor: "#f2c94c", backgroundColor: "rgba(242,201,76,0.15)", fill: true, tension: 0.3, pointRadius: 4 }] },
         options: {
             plugins: { legend: { display: false }, datalabels: { color: "#f2c94c", anchor: "end", align: "top", font: { size: 10, weight: 600 }, formatter: v => v + "%" } },
-            scales: { x: { ticks: { color: "#96b7ff" }, grid: { display: false } }, y: { ticks: { color: "#96b7ff", callback: v => v + "%" }, grid: { color: "#1a2a4a" } } },
-            maintainAspectRatio: false
+            scales: baseScales({ ticks: { color: "#96b7ff", callback: v => v + "%" } }), layout: baseLayout, maintainAspectRatio: false
         }
     });
 
