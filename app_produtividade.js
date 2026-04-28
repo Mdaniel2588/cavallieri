@@ -626,7 +626,7 @@ function toggleDetalhe(key) {
 
 // ── Timeline ──
 const API_TIMELINE = API_BASE + "/timeline";
-const API_COMPARATIVO = "https://192.168.0.27:8443/api/produtividade/comparativo";
+const API_COMPARATIVO = API_BASE + "/comparativo";
 
 let chartCompCanal = null;
 let chartCompPipeline = null;
@@ -646,7 +646,7 @@ async function carregarComparativos() {
     }
 
     try {
-        const r = await fetch(`${API_COMPARATIVO}?data_inicio=${di}&data_fim=${df}`);
+        const r = await window.apiFetch(`${API_COMPARATIVO}?data_inicio=${di}&data_fim=${df}`);
         const j = await r.json();
         if (!j.ok) throw new Error(j.error || j.erro || "Erro");
         renderComparativos(j);
