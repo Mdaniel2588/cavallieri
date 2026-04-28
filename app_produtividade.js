@@ -455,7 +455,7 @@ function renderMarcacao(marc, octaMap) {
                 h += `<div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:8px;">${labelMap[key]||key} — ${items.length} registros</div>`;
                 const isReclam = key === 'reclamacao';
                 const headCols = isReclam
-                    ? '<th>Data</th><th style="text-align:left;">Paciente</th><th>Telefone</th><th>Categoria</th><th style="text-align:left;width:100%;">Resumo IA</th><th>Agente</th>'
+                    ? '<th>Data</th><th style="text-align:left;">Paciente</th><th>Telefone</th><th>Categoria</th><th style="text-align:left;width:100%;">Resumo</th><th>Agente</th>'
                     : '<th>Data</th><th style="text-align:left;">Paciente</th><th>Telefone</th><th>Agente</th>';
                 h += `<table class="prod-table prod-table-sm" style="table-layout:auto;"><thead><tr>${headCols}</tr></thead><tbody>`;
                 for (const it of items) {
