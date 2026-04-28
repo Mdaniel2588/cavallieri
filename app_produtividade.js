@@ -743,7 +743,7 @@ function renderComparativos(data) {
         }
     });
 
-    // Chart 3: Taxas
+    // Chart 3: Taxas (com numeros visiveis sempre)
     if (chartCompTaxas) chartCompTaxas.destroy();
     chartCompTaxas = new Chart(document.getElementById("chartCompTaxas"), {
         type: "line",
@@ -757,7 +757,11 @@ function renderComparativos(data) {
         options: {
             plugins: {
                 legend: { labels: { color: "#c4dbff", font: { size: 11 } }, position: "top" },
-                datalabels: { display: false }
+                datalabels: {
+                    color: ctx => ctx.dataset.borderColor, anchor: "end", align: "top",
+                    font: { size: 10, weight: 600 },
+                    formatter: v => v > 0 ? v + "%" : ""
+                }
             },
             scales: baseScales({ ticks: { color: "#96b7ff", callback: v => v + "%" } }), layout: baseLayout, maintainAspectRatio: false
         }
