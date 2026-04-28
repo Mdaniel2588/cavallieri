@@ -120,10 +120,10 @@ async function iniciarDashboard() {
         initProdutividade();
     }
 
-    // Painel de usuarios (master) — desativado: ACL gerenciado direto no servidor
-    // if (userAuth && userAuth.acesso && userAuth.acesso.includes("usuarios")) {
-    //     initPainelUsuarios();
-    // }
+    // Painel de usuarios (master)
+    if (userAuth && userAuth.acesso && userAuth.acesso.includes("usuarios")) {
+        initPainelUsuarios();
+    }
 
     preencherMeses();
     preencherAnos();
@@ -284,27 +284,40 @@ function bindNavegacao() {
     }
 }
 
-function initPainelUsuarios() {
+const API_ACL = "https://kliniki.cavalliericlinica.com.br:444/clinic_bridge/index.php/produtividade/acl";
+
+async function initPainelUsuarios() {
     const secao = document.getElementById("secaoUsuarios");
     if (!secao) return;
-
-    renderPainelUsuarios();
+    await renderPainelUsuarios();
 }
 
-function renderPainelUsuarios() {
+async function renderPainelUsuarios() {
     const secao = document.getElementById("secaoUsuarios");
     if (!secao) return;
 
-    const usuarios = getUsuariosCadastrados();
-    const lista = Object.entries(usuarios);
+    secao.innerHTML = `<div style="padding:20px;color:#96b7ff;">Carregando usuarios...</div>`;
+
+    let usuarios = [];
+    try {
+        const r = await window.apiFetch(API_ACL);
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.erro || "Erro");
+        usuarios = data.usuarios || [];
+    } catch (e) {
+        secao.innerHTML = `<div style="padding:20px;color:#ffb3c1;">Erro carregando: ${e.message}</div>`;
+        return;
+    }
 
     let html = `
         <div style="padding:20px;">
-            <h3 style="color:#3a86ff;margin-bottom:16px;">Gerenciar Usuarios</h3>
-            <div id="formNovoUsuario" class="user-form">
-                <input id="novoLogin" class="login-input" placeholder="Login" style="width:120px;" />
-                <input id="novoNome" class="login-input" placeholder="Nome completo" style="width:200px;" />
-                <input id="novoSenha" class="login-input" type="password" placeholder="Senha" style="width:140px;" />
+            <h3 style="color:#3a86ff;margin-bottom:6px;">Gerenciar Usuarios</h3>
+            <div style="color:#96b7ff;font-size:12px;margin-bottom:16px;">
+                A senha é a do Kliniki. Aqui você só libera quem pode acessar e em quais painéis.
+            </div>
+            <div id="formNovoUsuario" class="user-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input id="novoLogin" class="login-input" placeholder="Login Kliniki (ex: DSR)" style="width:160px;text-transform:uppercase;" />
+                <input id="novoNome" class="login-input" placeholder="Nome completo" style="width:240px;" />
                 <label style="color:#96b7ff;font-size:12px;display:flex;align-items:center;gap:4px;">
                     <input type="checkbox" id="acessoPerf" checked /> Performance
                 </label>
@@ -316,126 +329,94 @@ function renderPainelUsuarios() {
             <div id="erroUsuario" style="color:#ffb3c1;font-size:13px;margin-top:8px;" hidden></div>
             <table class="prod-table" style="margin-top:16px;">
                 <thead><tr>
-                    <th>Login</th><th>Nome</th><th>Acesso</th><th>Acao</th>
+                    <th>Login</th><th style="text-align:left;">Nome</th><th>Perfil</th><th>Acessos</th><th>Açao</th>
                 </tr></thead>
-                <tbody>
-                    <tr style="background:#1a2a4a;">
-                        <td style="font-weight:bold;color:#f2c94c;">MD</td>
-                        <td>Maicon Daniel</td>
-                        <td>MASTER (tudo)</td>
-                        <td style="color:#555;">-</td>
-                    </tr>`;
+                <tbody>`;
 
-    for (const [login, u] of lista) {
-        const acessoStr = (u.acesso || ["performance"]).join(", ");
-        const temPerf = (u.acesso || []).includes("performance");
-        const temProd = (u.acesso || []).includes("produtividade");
-        html += `<tr>
-            <td style="font-weight:bold;">${login}</td>
-            <td>${u.nome}</td>
+    for (const u of usuarios) {
+        const acessoStr = (u.acessos || []).join(", ") || "-";
+        const temPerf = (u.acessos || []).includes("performance");
+        const temProd = (u.acessos || []).includes("produtividade");
+        const isMaster = u.perfil === "master";
+        const acoesCol = isMaster
+            ? `<td style="color:#666;">você (não pode remover)</td>`
+            : `<td style="display:flex;gap:4px;justify-content:center;">
+                <button class="btn-editar-user" data-login="${u.login}" data-nome="${u.nome}" data-perf="${temPerf}" data-prod="${temProd}" style="background:#1a3a5c;border-color:#5ca1ff;color:#c4dbff;padding:4px 10px;font-size:11px;cursor:pointer;">Editar</button>
+                <button class="btn-remover-user" data-login="${u.login}" style="background:#5c1d2b;border-color:#ff8aa1;color:#ffe3e7;padding:4px 10px;font-size:11px;cursor:pointer;">Remover</button>
+            </td>`;
+        html += `<tr ${isMaster ? 'style="background:#1a2a4a;"' : ''}>
+            <td style="font-weight:bold;color:${isMaster ? '#f2c94c' : '#4cc9f0'};">${u.login}</td>
+            <td style="text-align:left;">${u.nome || '-'}</td>
+            <td>${isMaster ? '<span style="color:#f2c94c;font-weight:600;">MASTER</span>' : 'usuário'}</td>
             <td>${acessoStr}</td>
-            <td style="display:flex;gap:4px;">
-                <button class="btn-editar-user" data-login="${login}" data-nome="${u.nome}" data-perf="${temPerf}" data-prod="${temProd}" style="background:#1a3a5c;border-color:#5ca1ff;color:#c4dbff;padding:4px 10px;font-size:11px;cursor:pointer;">Editar</button>
-                <button class="btn-remover-user" data-login="${login}" style="background:#5c1d2b;border-color:#ff8aa1;color:#ffe3e7;padding:4px 10px;font-size:11px;cursor:pointer;">Remover</button>
-            </td>
+            ${acoesCol}
         </tr>`;
     }
 
     html += `</tbody></table></div>`;
     secao.innerHTML = html;
 
-    // Bind adicionar/salvar
-    document.getElementById("btnAdicionarUsuario").addEventListener("click", () => {
+    document.getElementById("btnAdicionarUsuario").addEventListener("click", async () => {
         const btnAdd = document.getElementById("btnAdicionarUsuario");
         const editando = btnAdd.dataset.editando || "";
-        const login = editando || document.getElementById("novoLogin").value.trim();
+        const login = (editando || document.getElementById("novoLogin").value.trim()).toUpperCase();
         const nome = document.getElementById("novoNome").value.trim();
-        const senha = document.getElementById("novoSenha").value;
         const acessoPerf = document.getElementById("acessoPerf").checked;
         const acessoProd = document.getElementById("acessoProd").checked;
-        const erro = document.getElementById("erroUsuario");
+        const erroEl = document.getElementById("erroUsuario");
 
-        if (!login || !nome) {
-            erro.textContent = "Preencha login e nome.";
-            erro.hidden = false;
-            return;
-        }
-        if (!editando && !senha) {
-            erro.textContent = "Preencha a senha.";
-            erro.hidden = false;
-            return;
-        }
-        if (login === MASTER_USER.login) {
-            erro.textContent = "Login reservado.";
-            erro.hidden = false;
-            return;
-        }
+        const acessos = [];
+        if (acessoPerf) acessos.push("performance");
+        if (acessoProd) acessos.push("produtividade");
 
-        const acesso = [];
-        if (acessoPerf) acesso.push("performance");
-        if (acessoProd) acesso.push("produtividade");
-        if (!acesso.length) {
-            erro.textContent = "Selecione pelo menos um acesso.";
-            erro.hidden = false;
-            return;
+        try {
+            const r = await window.apiFetch(API_ACL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ login, nome, acessos })
+            });
+            const data = await r.json();
+            if (!data.ok) throw new Error(data.erro || "Erro ao salvar");
+            erroEl.hidden = true;
+            btnAdd.textContent = "ADICIONAR";
+            btnAdd.dataset.editando = "";
+            document.getElementById("novoLogin").disabled = false;
+            document.getElementById("novoLogin").value = "";
+            document.getElementById("novoNome").value = "";
+            document.getElementById("acessoPerf").checked = true;
+            document.getElementById("acessoProd").checked = false;
+            await renderPainelUsuarios();
+        } catch (e) {
+            erroEl.textContent = e.message;
+            erroEl.hidden = false;
         }
-
-        const usuarios = getUsuariosCadastrados();
-        if (editando && usuarios[login]) {
-            // Editar: manter senha se não preencheu nova
-            usuarios[login].nome = nome;
-            usuarios[login].acesso = acesso;
-            if (senha) usuarios[login].senha = senha;
-        } else {
-            usuarios[login] = { nome, senha, perfil: "usuario", acesso };
-        }
-        salvarUsuarios(usuarios);
-        erro.hidden = true;
-
-        // Reset form
-        btnAdd.textContent = "ADICIONAR";
-        btnAdd.dataset.editando = "";
-        document.getElementById("novoLogin").disabled = false;
-        document.getElementById("novoSenha").placeholder = "Senha";
-        renderPainelUsuarios();
     });
 
-    // Bind editar
     document.querySelectorAll(".btn-editar-user").forEach(btn => {
         btn.addEventListener("click", () => {
-            const login = btn.dataset.login;
-            const nome = btn.dataset.nome;
-            const temPerf = btn.dataset.perf === "true";
-            const temProd = btn.dataset.prod === "true";
-
-            // Preencher form com dados atuais
-            document.getElementById("novoLogin").value = login;
+            document.getElementById("novoLogin").value = btn.dataset.login;
             document.getElementById("novoLogin").disabled = true;
-            document.getElementById("novoNome").value = nome;
-            document.getElementById("novoSenha").value = "";
-            document.getElementById("novoSenha").placeholder = "Deixe vazio pra manter";
-            document.getElementById("acessoPerf").checked = temPerf;
-            document.getElementById("acessoProd").checked = temProd;
-
-            // Mudar botão pra "SALVAR"
+            document.getElementById("novoNome").value = btn.dataset.nome;
+            document.getElementById("acessoPerf").checked = btn.dataset.perf === "true";
+            document.getElementById("acessoProd").checked = btn.dataset.prod === "true";
             const btnAdd = document.getElementById("btnAdicionarUsuario");
             btnAdd.textContent = "SALVAR";
-            btnAdd.dataset.editando = login;
-
-            // Scroll pro form
+            btnAdd.dataset.editando = btn.dataset.login;
             document.getElementById("formNovoUsuario").scrollIntoView({ behavior: "smooth" });
         });
     });
 
-    // Bind remover
     document.querySelectorAll(".btn-remover-user").forEach(btn => {
-        btn.addEventListener("click", () => {
-            if (!confirm("Remover usuario " + btn.dataset.login + "?")) return;
-            const login = btn.dataset.login;
-            const usuarios = getUsuariosCadastrados();
-            delete usuarios[login];
-            salvarUsuarios(usuarios);
-            renderPainelUsuarios();
+        btn.addEventListener("click", async () => {
+            if (!confirm("Remover acesso de " + btn.dataset.login + "?")) return;
+            try {
+                const r = await window.apiFetch(API_ACL + '/' + encodeURIComponent(btn.dataset.login), { method: 'DELETE' });
+                const data = await r.json();
+                if (!data.ok) throw new Error(data.erro || "Erro");
+                await renderPainelUsuarios();
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
         });
     });
 }
