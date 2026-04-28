@@ -66,6 +66,8 @@ function initProdutividade() {
     el.panelMarc = document.getElementById("panelMarcacao");
     el.panelRecep = document.getElementById("panelRecepcao");
     el.panelTimeline = document.getElementById("panelTimeline");
+    el.panelComparativos = document.getElementById("panelComparativos");
+    el.tabComparativos = document.getElementById("tabComparativos");
     el.timelineData = document.getElementById("timelineData");
     el.timelineConteudo = document.getElementById("timelineConteudo");
     el.btnTimelineCarregar = document.getElementById("btnTimelineCarregar");
@@ -84,7 +86,10 @@ function initProdutividade() {
 
     el.tabMarc.addEventListener("click", () => setTab("marc"));
     el.tabRecep.addEventListener("click", () => setTab("recep"));
+    el.tabComparativos.addEventListener("click", () => setTab("comparativos"));
     el.tabTimeline.addEventListener("click", () => setTab("timeline"));
+    const sel = document.getElementById("compMeses");
+    if (sel) sel.addEventListener("change", () => carregarComparativos());
     el.timelineData.value = new Date().toISOString().slice(0,10);
     el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
 
@@ -210,7 +215,12 @@ let currentTab = "marc";
 function setTab(tab) {
     currentTab = tab;
     el.tabMarc.classList.toggle("active", tab==="marc"); el.tabRecep.classList.toggle("active", tab==="recep"); el.tabTimeline.classList.toggle("active", tab==="timeline");
-    el.panelMarc.style.display = tab==="marc" ? "" : "none"; el.panelRecep.style.display = tab==="recep" ? "" : "none"; el.panelTimeline.style.display = tab==="timeline" ? "" : "none";
+    el.panelMarc.style.display = tab==="marc" ? "" : "none";
+    el.panelRecep.style.display = tab==="recep" ? "" : "none";
+    el.panelTimeline.style.display = tab==="timeline" ? "" : "none";
+    if (el.panelComparativos) el.panelComparativos.style.display = tab==="comparativos" ? "" : "none";
+    el.tabComparativos.classList.toggle("active", tab==="comparativos");
+    if (tab === "comparativos") carregarComparativos();
     if (tab === "timeline" && !el.timelineConteudo.innerHTML) carregarTimeline();
     if (prodData) renderChart();
 }
@@ -400,10 +410,15 @@ function renderMarcacao(marc, octaMap) {
 
     const tL=lista.reduce((s,u)=>s+(u.ligacoes||0),0), tW=lista.reduce((s,u)=>s+u.wpp,0), tAtend=tL+tW;
     const tM=lista.reduce((s,u)=>s+(u.marcacoes||0),0) + diretos.reduce((s,u)=>s+(u.marcacoes||0),0);
+    const txConv = tAtend > 0 ? (tM / tAtend * 100).toFixed(1) : '-';
+    const txConvColor = tAtend > 0 ? (parseFloat(txConv) >= 20 ? '#2ecc71' : parseFloat(txConv) >= 12 ? '#3498db' : parseFloat(txConv) >= 8 ? '#f39c12' : '#e94560') : '#666';
     h+=`<tr class="total-row"><td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td>
         <td class="num-cell">${tL||'-'}</td><td></td><td class="num-cell">${tW||'-'}</td><td></td>
         <td class="num-cell total-cell" style="font-size:14px;">${tAtend}</td>
-        <td class="num-cell" style="color:#f2c94c;">${tM}</td><td colspan="4"></td></tr></tbody></table>`;
+        <td class="num-cell" style="color:#f2c94c;">${tM}</td>
+        <td colspan="2"></td>
+        <td class="num-cell" style="color:${txConvColor};font-weight:700;font-size:13px;">${txConv}${tAtend>0?'%':''}</td>
+        <td></td></tr></tbody></table>`;
 
     // Cards de classificação — canal real + WhatsApp
     const cWpp = _canal.whatsapp||0, cTel = _canal.telefone||0, cHib = _canal.hibrido||0, cDir = _canal.agendado_direto||0, cTotal = cWpp+cTel+cHib+cDir;
@@ -559,6 +574,87 @@ function toggleDetalhe(key) {
 
 // ── Timeline ──
 const API_TIMELINE = API_BASE + "/timeline";
+const API_HISTORICO = API_BASE + "/historico";
+
+let chartHistMarc = null;
+let chartHistPV = null;
+let chartHistCaptacao = null;
+
+async function carregarComparativos() {
+    const meses = parseInt(document.getElementById("compMeses").value, 10) || 12;
+    const status = document.getElementById("compStatus");
+    if (status) status.textContent = "Carregando...";
+    try {
+        const r = await window.apiFetch(`${API_HISTORICO}?meses=${meses}`);
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.erro || "Erro");
+        renderComparativos(j.data);
+        if (status) status.textContent = `${j.data.serie.length} meses (${j.data.inicio} → ${j.data.fim})`;
+    } catch (e) {
+        if (status) status.textContent = "Erro: " + e.message;
+    }
+}
+
+function renderComparativos(data) {
+    const labels = data.serie.map(s => s.label);
+    const marc = data.serie.map(s => s.marcacoes);
+    const pv = data.serie.map(s => s.pacientes_primeira_vez);
+    const cap = data.serie.map(s => s.marcacoes > 0 ? Math.round(s.pacientes_primeira_vez / s.marcacoes * 1000) / 10 : 0);
+
+    if (chartHistMarc) chartHistMarc.destroy();
+    chartHistMarc = new Chart(document.getElementById("chartHistMarc"), {
+        type: "bar",
+        data: { labels, datasets: [{ label: "Marcações", data: marc, backgroundColor: "#4cc9f0", borderRadius: 4 }] },
+        options: {
+            plugins: { legend: { display: false }, datalabels: { color: "#fff", anchor: "end", align: "top", font: { size: 10 } } },
+            scales: { x: { ticks: { color: "#96b7ff" }, grid: { display: false } }, y: { ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" } } },
+            maintainAspectRatio: false
+        }
+    });
+
+    if (chartHistPV) chartHistPV.destroy();
+    chartHistPV = new Chart(document.getElementById("chartHistPV"), {
+        type: "bar",
+        data: { labels, datasets: [{ label: "Pacientes 1ª vez", data: pv, backgroundColor: "#2ecc71", borderRadius: 4 }] },
+        options: {
+            plugins: { legend: { display: false }, datalabels: { color: "#fff", anchor: "end", align: "top", font: { size: 10 } } },
+            scales: { x: { ticks: { color: "#96b7ff" }, grid: { display: false } }, y: { ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" } } },
+            maintainAspectRatio: false
+        }
+    });
+
+    if (chartHistCaptacao) chartHistCaptacao.destroy();
+    chartHistCaptacao = new Chart(document.getElementById("chartHistCaptacao"), {
+        type: "line",
+        data: { labels, datasets: [{ label: "% captação", data: cap, borderColor: "#f2c94c", backgroundColor: "rgba(242,201,76,0.15)", fill: true, tension: 0.3, pointRadius: 4 }] },
+        options: {
+            plugins: { legend: { display: false }, datalabels: { color: "#f2c94c", anchor: "end", align: "top", font: { size: 10, weight: 600 }, formatter: v => v + "%" } },
+            scales: { x: { ticks: { color: "#96b7ff" }, grid: { display: false } }, y: { ticks: { color: "#96b7ff", callback: v => v + "%" }, grid: { color: "#1a2a4a" } } },
+            maintainAspectRatio: false
+        }
+    });
+
+    const totMarc = marc.reduce((a, b) => a + b, 0);
+    const totPV = pv.reduce((a, b) => a + b, 0);
+    const capMedia = totMarc > 0 ? (totPV / totMarc * 100).toFixed(1) : 0;
+    const ult = data.serie[data.serie.length - 1] || {};
+    const ant = data.serie[data.serie.length - 2] || {};
+    const trendMarc = ant.marcacoes > 0 ? Math.round((ult.marcacoes - ant.marcacoes) / ant.marcacoes * 100) : 0;
+    const trendPV = ant.pacientes_primeira_vez > 0 ? Math.round((ult.pacientes_primeira_vez - ant.pacientes_primeira_vez) / ant.pacientes_primeira_vez * 100) : 0;
+
+    const colorTrend = v => v >= 0 ? "#2ecc71" : "#e94560";
+    const arrow = v => v >= 0 ? "▲" : "▼";
+
+    document.getElementById("compResumo").innerHTML = `
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div><b style="color:#4cc9f0;">Total marcações:</b> ${totMarc.toLocaleString("pt-BR")}</div>
+            <div><b style="color:#2ecc71;">Total pacientes 1ª vez:</b> ${totPV.toLocaleString("pt-BR")}</div>
+            <div><b style="color:#f2c94c;">Captação média:</b> ${capMedia}%</div>
+            <div>Último mês vs anterior — Marc.: <span style="color:${colorTrend(trendMarc)};font-weight:600;">${arrow(trendMarc)} ${Math.abs(trendMarc)}%</span></div>
+            <div>Pac. novos: <span style="color:${colorTrend(trendPV)};font-weight:600;">${arrow(trendPV)} ${Math.abs(trendPV)}%</span></div>
+        </div>
+    `;
+}
 const ST_RAMAIS = "cavalieri_ramais_custom";
 const MAPA_PADRAO = {
     "192.168.0.1":{host:"205MARC01",ramal:null,setor:"marcacao"},"192.168.0.2":{host:"205MARC02",ramal:"2056",setor:"marcacao"},

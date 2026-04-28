@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clinica Cavallieri</title>
-    <link rel="stylesheet" href="styles.css?v=20260428a">
+    <link rel="stylesheet" href="styles.css?v=20260428b">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script defer src="app.js?v=20260428a"></script>
-    <script defer src="app_produtividade.js?v=20260428a"></script>
+    <script defer src="app.js?v=20260428b"></script>
+    <script defer src="app_produtividade.js?v=20260428b"></script>
     <style>
     /* Calendario inline */
     .cal-wrapper{user-select:none;}
@@ -176,10 +176,11 @@
             </div>
         </div>
 
-        <!-- Sub-tabs: Marcação / Recepção / Timeline -->
+        <!-- Sub-tabs: Marcação / Recepção / Comparativos / Timeline -->
         <div class="prod-subtabs">
             <button id="tabMarcacao" class="prod-subtab active" type="button">MARCACAO</button>
             <button id="tabRecepcao" class="prod-subtab" type="button">RECEPCAO</button>
+            <button id="tabComparativos" class="prod-subtab" type="button">COMPARATIVOS</button>
             <button id="tabTimeline" class="prod-subtab" type="button">TIMELINE</button>
         </div>
 
@@ -188,6 +189,34 @@
 
         <!-- Painel Recepção -->
         <div class="prod-table-wrapper" id="panelRecepcao" style="display:none;"></div>
+
+        <!-- Painel Comparativos -->
+        <div class="prod-table-wrapper" id="panelComparativos" style="display:none;">
+            <div style="padding:8px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <span style="color:#96b7ff;font-size:13px;font-weight:600;">Janela:</span>
+                <select id="compMeses" style="background:#1a2a4a;color:#c4dbff;border:1px solid #2a3a5a;border-radius:4px;padding:4px 8px;font-size:13px;">
+                    <option value="6">Últimos 6 meses</option>
+                    <option value="12" selected>Últimos 12 meses</option>
+                    <option value="24">Últimos 24 meses</option>
+                </select>
+                <span id="compStatus" style="color:#666;font-size:12px;"></span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;">
+                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Marcações Kliniki por mês</div>
+                    <canvas id="chartHistMarc" style="max-height:260px;"></canvas>
+                </div>
+                <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;">
+                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Pacientes 1ª vez por mês</div>
+                    <canvas id="chartHistPV" style="max-height:260px;"></canvas>
+                </div>
+                <div style="background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;padding:12px;grid-column:1/-1;">
+                    <div style="font-size:12px;font-weight:700;color:#96b7ff;margin-bottom:6px;">Captação: % de marcações que viraram paciente novo</div>
+                    <canvas id="chartHistCaptacao" style="max-height:260px;"></canvas>
+                </div>
+            </div>
+            <div id="compResumo" style="margin-top:12px;padding:10px;background:#0f1738;border:1px solid #2f4f9c;border-radius:10px;color:#c4dbff;font-size:13px;"></div>
+        </div>
 
         <!-- Painel Timeline -->
         <div class="prod-table-wrapper" id="panelTimeline" style="display:none;">
