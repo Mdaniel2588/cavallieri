@@ -633,20 +633,43 @@ let chartCompPipeline = null;
 let chartCompTaxas = null;
 
 async function carregarComparativos() {
-    // Range: usa _pcalSelA/B se tiver, senão últimos 30 dias
-    let di, df;
-    if (_pcalSelA && _pcalSelB) {
+    // Decide range + granularidade baseado no filtro do topo
+    const h = new Date();
+    let ini, fim, gran = "";
+    if (_pcalQuick === "hoje") {
+        ini = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+        fim = new Date(ini);
+        gran = "hora";
+    } else if (_pcalQuick === "semana") {
+        // Semana inteira: segunda 00:00 ate domingo 23:59
+        const dow = h.getDay();
+        const seg = h.getDate() - (dow === 0 ? 6 : dow - 1);
+        ini = new Date(h.getFullYear(), h.getMonth(), seg);
+        fim = new Date(h.getFullYear(), h.getMonth(), seg + 6);
+        gran = "dia";
+    } else if (_pcalQuick === "mes") {
+        ini = new Date(h.getFullYear(), h.getMonth(), 1);
+        fim = new Date(h.getFullYear(), h.getMonth()+1, 0);
+        gran = "semana";
+    } else if (_pcalQuick === "trimestre" || _pcalQuick === "semestral" || _pcalQuick === "anual") {
+        if (_pcalSelA && _pcalSelB) { ini = _pcalSelA; fim = _pcalSelB; }
+        else { ini = new Date(h.getFullYear(), h.getMonth()-2, 1); fim = h; }
+        gran = "mes";
+    } else if (_pcalSelA && _pcalSelB) {
         const a = _pcalSelA, b = _pcalSelB;
-        di = _toISO(a < b ? a : b);
-        df = _toISO(a < b ? b : a);
+        ini = a < b ? a : b; fim = a < b ? b : a;
+        // sem override → backend decide pelo range
     } else {
-        const h = new Date();
-        const ini = new Date(h.getFullYear(), h.getMonth()-1, h.getDate());
-        di = _toISO(ini); df = _toISO(h);
+        ini = new Date(h.getFullYear(), h.getMonth()-1, h.getDate());
+        fim = h;
     }
 
+    const di = _toISO(ini), df = _toISO(fim);
+    let qs = `data_inicio=${di}&data_fim=${df}`;
+    if (gran) qs += `&gran=${gran}`;
+
     try {
-        const r = await window.apiFetch(`${API_COMPARATIVO}?data_inicio=${di}&data_fim=${df}`);
+        const r = await window.apiFetch(`${API_COMPARATIVO}?${qs}`);
         const j = await r.json();
         if (!j.ok) throw new Error(j.error || j.erro || "Erro");
         renderComparativos(j);
