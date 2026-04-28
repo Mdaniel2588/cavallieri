@@ -695,29 +695,30 @@ function renderComparativos(data) {
     });
     const baseLayout = { padding: { top: 18 } };
 
-    // Chart 1: Atendimentos por canal (stacked bars)
+    // Chart 1: Atendimentos por canal (barras lado a lado, com numeros)
     if (chartCompCanal) chartCompCanal.destroy();
     chartCompCanal = new Chart(document.getElementById("chartCompCanal"), {
         type: "bar",
         data: {
             labels,
             datasets: [
-                { label: "Telefone", data: tel, backgroundColor: "#3a86ff", borderRadius: 4, stack: "atend" },
-                { label: "WhatsApp", data: wpp, backgroundColor: "#25d366", borderRadius: 4, stack: "atend" }
+                { label: "Telefone", data: tel, backgroundColor: "#3a86ff", borderRadius: 4 },
+                { label: "WhatsApp", data: wpp, backgroundColor: "#25d366", borderRadius: 4 }
             ]
         },
         options: {
             plugins: {
                 legend: { labels: { color: "#c4dbff", font: { size: 11 } }, position: "top" },
-                datalabels: { display: false }
+                datalabels: {
+                    color: "#fff", anchor: "end", align: "top", font: { size: 10, weight: 600 },
+                    formatter: v => v > 0 ? v : ""
+                }
             },
-            scales: { x: { stacked: true, ticks: { color: "#96b7ff" }, grid: { display: false } },
-                      y: { stacked: true, ticks: { color: "#96b7ff" }, grid: { color: "#1a2a4a" }, beginAtZero: true, grace: "10%" } },
-            layout: baseLayout, maintainAspectRatio: false
+            scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
         }
     });
 
-    // Chart 2: Pipeline (3 lines)
+    // Chart 2: Pipeline (3 lines com numeros)
     if (chartCompPipeline) chartCompPipeline.destroy();
     chartCompPipeline = new Chart(document.getElementById("chartCompPipeline"), {
         type: "line",
@@ -732,7 +733,11 @@ function renderComparativos(data) {
         options: {
             plugins: {
                 legend: { labels: { color: "#c4dbff", font: { size: 11 } }, position: "top" },
-                datalabels: { display: false }
+                datalabels: {
+                    color: ctx => ctx.dataset.borderColor, anchor: "end", align: "top",
+                    font: { size: 10, weight: 600 },
+                    formatter: v => v > 0 ? v : ""
+                }
             },
             scales: baseScales(), layout: baseLayout, maintainAspectRatio: false
         }
