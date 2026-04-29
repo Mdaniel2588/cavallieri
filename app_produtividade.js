@@ -440,13 +440,11 @@ async function carregarProd() {
     }
 
     const url = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_3cx=1${mapaParam}${dateParams}`;
-    console.log('[PROD] URL:', url, '_pcalSelA:', _pcalSelA, '_pcalSelB:', _pcalSelB, 'range:', range);
     showSt("Carregando...", "info");
     try {
         const r1 = await window.apiFetch(url); const j1 = await r1.json();
         if (!j1.ok) throw new Error(j1.erro||"Erro");
         prodData = j1.data;
-        console.log('[PROD] response data_inicio=', j1.data?.data_inicio, 'data_fim=', j1.data?.data_fim, 'recep:', (j1.data?.recepcao||[]).slice(0,3).map(u => `${u.usuario}=${u.admissoes}`).join(' '), 'total recep:', (j1.data?.recepcao||[]).reduce((s,u)=>s+(u.admissoes||0),0));
 
         // WhatsApp + canal via proxy clinic_bridge → .27
         const octaUrl = `${API_WHATSAPP}?periodo=${periodoParam}&ano=${ano}&mes=${mes}${dateParams}`;
