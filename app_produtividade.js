@@ -249,7 +249,13 @@ function _handleProdQuick(tipo) {
     else if (tipo === "semana") { const dow=h.getDay(); const seg=h.getDate()-(dow===0?6:dow-1); _pcalSelA=new Date(h.getFullYear(),h.getMonth(),seg); _pcalSelB=new Date(h.getFullYear(),h.getMonth(),h.getDate()); prodPeriodo = "semana"; }
     else if (tipo === "mes") { _pcalSelA=new Date(h.getFullYear(),h.getMonth(),1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "mes"; }
     else if (tipo === "trimestre") { _pcalSelA=new Date(h.getFullYear(),h.getMonth()-2,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "trimestre"; }
-    else if (tipo === "semestral") { _pcalSelA=new Date(h.getFullYear(),h.getMonth()-5,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "semestral"; }
+    else if (tipo === "semestral") {
+        // Calendario: 1º sem = jan-jun, 2º sem = jul-dez. Cap em hoje pro semestre corrente.
+        const semStart = h.getMonth() < 6 ? 0 : 6;
+        _pcalSelA = new Date(h.getFullYear(), semStart, 1);
+        _pcalSelB = new Date(h.getFullYear(), h.getMonth()+1, 0);
+        prodPeriodo = "semestral";
+    }
     else if (tipo === "anual") { _pcalSelA=new Date(h.getFullYear(),0,1); _pcalSelB=new Date(h.getFullYear(),h.getMonth()+1,0); prodPeriodo = "anual"; }
     _pcalMes = h.getMonth(); _pcalAno = h.getFullYear(); _pcalExpanded = false;
     _applyCalProd(); _renderCalProd(); carregarProd();
