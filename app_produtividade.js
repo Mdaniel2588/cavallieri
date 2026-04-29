@@ -65,10 +65,14 @@ function initProdutividade() {
     el.tabMarc = document.getElementById("tabMarcacao");
     el.tabRecep = document.getElementById("tabRecepcao");
     el.tabTimeline = document.getElementById("tabTimeline");
+    el.tabAnaliseGeral = document.getElementById("tabAnaliseGeral");
     el.panelMarc = document.getElementById("panelMarcacao");
     el.panelRecep = document.getElementById("panelRecepcao");
     el.panelTimeline = document.getElementById("panelTimeline");
     el.panelComparativos = document.getElementById("panelComparativos");
+    el.panelAnaliseGeral = document.getElementById("panelAnaliseGeral");
+    el.panelAnaliseConteudo = document.getElementById("panelAnaliseConteudo");
+    el.analiseInfo = document.getElementById("analiseInfo");
     el.tabComparativos = document.getElementById("tabComparativos");
     el.timelineData = document.getElementById("timelineData");
     el.timelineConteudo = document.getElementById("timelineConteudo");
@@ -90,6 +94,7 @@ function initProdutividade() {
     el.tabRecep.addEventListener("click", () => setTab("recep"));
     el.tabComparativos.addEventListener("click", () => setTab("comparativos"));
     el.tabTimeline.addEventListener("click", () => setTab("timeline"));
+    if (el.tabAnaliseGeral) el.tabAnaliseGeral.addEventListener("click", () => setTab("analise"));
     el.timelineData.value = new Date().toISOString().slice(0,10);
     el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
 
@@ -265,13 +270,115 @@ function setTab(tab) {
     el.panelRecep.style.display = tab==="recep" ? "" : "none";
     el.panelTimeline.style.display = tab==="timeline" ? "" : "none";
     if (el.panelComparativos) el.panelComparativos.style.display = tab==="comparativos" ? "" : "none";
+    if (el.panelAnaliseGeral) el.panelAnaliseGeral.style.display = tab==="analise" ? "" : "none";
     el.tabComparativos.classList.toggle("active", tab==="comparativos");
+    if (el.tabAnaliseGeral) el.tabAnaliseGeral.classList.toggle("active", tab==="analise");
     if (tab === "comparativos") carregarComparativos();
+    if (tab === "analise") carregarAnaliseGeral();
     if (tab === "timeline" && !el.timelineConteudo.innerHTML) carregarTimeline();
     if (prodData) renderChart();
 }
 
-function setPeriodo(p) { prodPeriodo = p; if(prodTimer){clearInterval(prodTimer);prodTimer=null;} carregarProd(); if (p === "hoje") prodTimer = setInterval(carregarProd, 120000); }
+function setPeriodo(p) {
+    prodPeriodo = p;
+    if(prodTimer){clearInterval(prodTimer);prodTimer=null;}
+    carregarProd();
+    if (p === "hoje") prodTimer = setInterval(carregarProd, 120000);
+    if (currentTab === "analise") carregarAnaliseGeral();
+}
+
+const API_TEMPO = API_BASE + "/tempo_atividade";
+let tempoData = null;
+
+function _fmtHM(min) {
+    if (min == null || min < 1) return "-";
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    return h === 0 ? `${m}m` : (m === 0 ? `${h}h` : `${h}h${String(m).padStart(2,'0')}`);
+}
+function _fmtHora(ts) { return ts ? (ts.split(' ')[1] || '-') : '-'; }
+
+async function carregarAnaliseGeral() {
+    if (!el.panelAnaliseConteudo) return;
+    el.panelAnaliseConteudo.innerHTML = '<div style="color:#96b7ff;padding:20px;text-align:center;">Carregando…</div>';
+    el.analiseInfo.textContent = "";
+    try {
+        const range = _getDateRange();
+        const ini = range.ini, fim = range.fim;
+        const fimAjust = new Date(new Date(fim).getTime() + 86400000).toISOString().slice(0,10);
+        const url = `${API_TEMPO}?data_inicio=${ini}&data_fim=${fimAjust}&media=diaria`;
+        const res = await window.apiFetch(url);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || json.erro || "Erro");
+        tempoData = json.data;
+        renderAnaliseGeral();
+    } catch (e) {
+        el.panelAnaliseConteudo.innerHTML = `<div style="color:#ffb3c1;padding:20px;">Falha: ${e.message}</div>`;
+    }
+}
+
+function renderAnaliseGeral() {
+    if (!tempoData || !tempoData.usuarios || !el.panelAnaliseConteudo) return;
+    el.analiseInfo.textContent = `${tempoData.dias_uteis} dias úteis | gap máx ${tempoData.gap_max_seg/60}min`;
+
+    // Mapas auxiliares (entregas) — usa prodData se carregado
+    const marcMap = {}, recepMap = {};
+    const octaMap = prodData ? buildOcta(prodData.octadesk || []) : {};
+    if (prodData) {
+        for (const u of (prodData.marcacao || [])) marcMap[u.usuario] = u;
+        for (const u of (prodData.recepcao || [])) recepMap[u.usuario] = u;
+    }
+
+    const corSetor = { marcacao:'#4dd0e1', recepcao:'#66bb6a', adm:'#ffb74d', ti:'#ba68c8', outros:'#78909c' };
+    const users = (tempoData.usuarios || []).filter(u => !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario));
+
+    let h = `<div style="overflow-x:auto;margin-top:8px;">
+      <table class="prod-table">
+        <thead><tr style="color:#96b7ff;text-align:left;">
+          <th>#</th><th>Sigla</th><th>Nome</th>
+          <th>Chegou</th><th>Último</th>
+          <th title="Tempo ativo total (gap >5min = pausa)">T.Total</th>
+          <th title="Tempo no setor marcação">MARC</th>
+          <th title="Tempo no setor recepção">REC</th>
+          <th title="Marcações no Kliniki">Agend.</th>
+          <th title="Admissões na recepção">Admis.</th>
+          <th title="Conversas WhatsApp">WPP</th>
+          <th title="Setor + estação do último log">Onde</th>
+        </tr></thead><tbody>`;
+
+    users.sort((a,b) => (b.min_total||0) - (a.min_total||0));
+    let p = 1;
+    for (const u of users) {
+        const mc = (marcMap[u.usuario]||{}).marcacoes || 0;
+        const ad = (recepMap[u.usuario]||{}).admissoes || 0;
+        const wp = (octaMap[u.usuario]||{}).total || 0;
+        const totalEntregas = mc + ad + wp;
+        const corpoMole = u.min_total > 60 && totalEntregas === 0;
+        const labelSet = u.ultimo_setor === 'marcacao' ? 'MARC' : u.ultimo_setor === 'recepcao' ? 'REC' : (u.ultimo_setor||'').toUpperCase() || '-';
+        const cSet = corSetor[u.ultimo_setor] || corSetor.outros;
+        h += `<tr style="${corpoMole ? 'background:rgba(233,69,96,0.08);' : ''}">
+            <td class="rank-cell">${p++}</td>
+            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td>
+            <td style="text-align:left;">${u.nome || OCTA_MAP_REV[u.usuario] || '-'}</td>
+            <td class="num-cell" style="color:#c4dbff;">${_fmtHora(u.chegou)}</td>
+            <td class="num-cell" style="color:#c4dbff;">${_fmtHora(u.ultimo_log)}</td>
+            <td class="num-cell" style="color:#fff;font-weight:700;">${_fmtHM(u.min_total)}</td>
+            <td class="num-cell" style="color:${corSetor.marcacao};">${_fmtHM(u.min_marcacao)}</td>
+            <td class="num-cell" style="color:${corSetor.recepcao};">${_fmtHM(u.min_recepcao)}</td>
+            <td class="num-cell" style="color:#f2c94c;font-weight:600;">${mc || '-'}</td>
+            <td class="num-cell" style="color:#66bb6a;font-weight:600;">${ad || '-'}</td>
+            <td class="num-cell">${wp || '-'}</td>
+            <td class="num-cell" style="text-align:left;font-size:11px;">
+              ${u.ultimo_setor ? `<span style="background:${cSet};color:#0a1230;padding:1px 5px;border-radius:3px;font-weight:700;font-size:10px;">${labelSet}</span> <span style="color:#96b7ff;">${u.ultimo_host || u.ultimo_ip || ''}</span>` : '-'}
+            </td>
+        </tr>`;
+    }
+    h += `</tbody></table></div>
+      <div style="margin-top:12px;padding:8px 12px;font-size:11px;color:#96b7ff;border-left:3px solid #e94560;background:rgba(233,69,96,0.05);">
+        <b style="color:#ffb3c1;">Linhas em vermelho:</b> usuário com mais de 1h de tempo ativo e zero entregas no período (alvo de investigação).
+      </div>`;
+
+    el.panelAnaliseConteudo.innerHTML = h;
+}
 
 async function carregarProd() {
     const ano=el.ano.value, mes=el.mes.value, range = _getDateRange();
@@ -342,8 +449,9 @@ function renderTitulo() {
     const fim = (range.fim || '').split('-').reverse().join('/');
     const dateStr = ini && fim ? (ini === fim ? ini : `${ini} a ${fim}`) : '';
 
+    const hojeISO = new Date().toISOString().slice(0,10);
     let label = "";
-    if (prodPeriodo === "hoje") label = "HOJE";
+    if (prodPeriodo === "hoje") label = (range.ini === hojeISO && range.fim === hojeISO) ? "HOJE" : "DIA";
     else if (_pcalQuick === "semana") label = "SEMANA";
     else if (_pcalQuick === "trimestre") label = "TRIMESTRE";
     else if (_pcalQuick === "semestral") label = "SEMESTRE";
