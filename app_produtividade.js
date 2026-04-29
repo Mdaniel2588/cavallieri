@@ -391,16 +391,7 @@ function renderAnaliseGeral() {
         </tr>`;
     }
     h += `</tbody></table></div>`;
-
-    // Lista de ocultos com botão restaurar
-    const ocultos = getOc();
-    if (ocultos.length) {
-        const nomes = {};
-        for (const u of (tempoData.usuarios||[])) nomes[u.usuario] = u.nome || OCTA_MAP_REV[u.usuario] || '';
-        h += `<div style="margin-top:10px;padding:8px 12px;background:#0f1738;border:1px solid #2f4f9c;border-radius:6px;font-size:12px;color:#96b7ff;">
-            <b style="color:#c4dbff;">Excluídos da análise:</b> ${ocultos.map(s => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:#1a2a4a;border-radius:3px;cursor:pointer;color:#fff;" onclick="toggleOc('${s}')" title="Restaurar">${s}${nomes[s] ? ' — '+nomes[s] : ''} <span style="color:#66bb6a;">↻</span></span>`).join('')}
-        </div>`;
-    }
+    h += _renderOcultosBar(prodData);
 
     el.panelAnaliseConteudo.innerHTML = h;
 }
@@ -706,7 +697,22 @@ function renderMarcacao(marc, octaMap) {
         <span><b style="color:#96b7ff;">Conv.</b> taxa marc. (<span style="color:#2ecc71">&#9679;</span>≥20% <span style="color:#3498db">&#9679;</span>≥12% <span style="color:#f39c12">&#9679;</span>≥8%)</span>
     </div>`;
 
+    h += _renderOcultosBar(prodData);
     el.panelMarc.innerHTML = h;
+}
+
+function _renderOcultosBar(pd) {
+    const ocultos = getOc();
+    if (!ocultos.length) return '';
+    const nomes = {};
+    if (pd) {
+        for (const u of (pd.marcacao||[])) if (u.nome) nomes[u.usuario] = u.nome;
+        for (const u of (pd.recepcao||[])) if (u.nome && !nomes[u.usuario]) nomes[u.usuario] = u.nome;
+    }
+    if (tempoData) for (const u of (tempoData.usuarios||[])) if (u.nome && !nomes[u.usuario]) nomes[u.usuario] = u.nome;
+    return `<div style="margin-top:10px;padding:8px 12px;background:#0f1738;border:1px solid #2f4f9c;border-radius:6px;font-size:12px;color:#96b7ff;">
+        <b style="color:#c4dbff;">Excluídos:</b> ${ocultos.map(s => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:#1a2a4a;border-radius:3px;cursor:pointer;color:#fff;" onclick="toggleOc('${s}')" title="Restaurar">${s}${nomes[s] ? ' — '+nomes[s] : (OCTA_MAP_REV[s] ? ' — '+OCTA_MAP_REV[s] : '')} <span style="color:#66bb6a;">↻</span></span>`).join('')}
+    </div>`;
 }
 
 function renderRecepcao(recep) {
@@ -717,6 +723,7 @@ function renderRecepcao(recep) {
     for(const u of lista) h+=`<tr><td class="rank-cell">${p++}</td><td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'}</td><td class="num-cell total-cell">${u.admissoes||0}</td><td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')">×</button></td></tr>`;
     const tA=lista.reduce((s,u)=>s+(u.admissoes||0),0);
     h+=`<tr class="total-row"><td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td><td class="num-cell total-cell" style="font-size:14px;">${tA}</td><td></td></tr></tbody></table>`;
+    h += _renderOcultosBar(prodData);
     el.panelRecep.innerHTML = h;
 }
 
