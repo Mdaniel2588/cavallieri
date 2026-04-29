@@ -38,7 +38,8 @@ for (const [nome, sigla] of Object.entries(OCTA_MAP)) OCTA_MAP_REV[sigla] = nome
 function sortBy(col) {
     if (_sortCol === col) _sortDir *= -1;
     else { _sortCol = col; _sortDir = -1; }
-    renderProd();
+    if (currentTab === "analise") renderAnaliseGeral();
+    else renderProd();
 }
 function sortArrow(col) {
     if (_sortCol !== col) return ' <span style="opacity:0.4;font-size:11px;">&#9650;&#9660;</span>';
@@ -300,7 +301,6 @@ function _fmtHora(ts) { return ts ? (ts.split(' ')[1] || '-') : '-'; }
 async function carregarAnaliseGeral() {
     if (!el.panelAnaliseConteudo) return;
     el.panelAnaliseConteudo.innerHTML = '<div style="color:#96b7ff;padding:20px;text-align:center;">Carregando…</div>';
-    el.analiseInfo.textContent = "";
     try {
         const range = _getDateRange();
         const ini = range.ini, fim = range.fim;
@@ -318,9 +318,7 @@ async function carregarAnaliseGeral() {
 
 function renderAnaliseGeral() {
     if (!tempoData || !tempoData.usuarios || !el.panelAnaliseConteudo) return;
-    el.analiseInfo.textContent = `${tempoData.dias_uteis} dias úteis | gap máx ${tempoData.gap_max_seg/60}min`;
 
-    // Mapas auxiliares (entregas) — usa prodData se carregado
     const marcMap = {}, recepMap = {};
     const octaMap = prodData ? buildOcta(prodData.octadesk || []) : {};
     if (prodData) {
@@ -329,29 +327,47 @@ function renderAnaliseGeral() {
     }
 
     const corSetor = { marcacao:'#4dd0e1', recepcao:'#66bb6a', adm:'#ffb74d', ti:'#ba68c8', outros:'#78909c' };
-    const users = (tempoData.usuarios || []).filter(u => !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario));
+
+    // Enriquece cada user com entregas pra usar nos sorts
+    const users = (tempoData.usuarios || [])
+        .filter(u => !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario))
+        .map(u => ({
+            ...u,
+            _agend: (marcMap[u.usuario]||{}).marcacoes || 0,
+            _admis: (recepMap[u.usuario]||{}).admissoes || 0,
+            _wpp: (octaMap[u.usuario]||{}).total || 0,
+        }));
+
+    // Sort usando _sortCol/_sortDir global
+    users.sort((a, b) => {
+        const va = a[_sortCol] ?? a['_'+_sortCol] ?? 0;
+        const vb = b[_sortCol] ?? b['_'+_sortCol] ?? 0;
+        if (typeof va === 'string') return va.localeCompare(vb) * _sortDir;
+        return (va > vb ? 1 : va < vb ? -1 : 0) * _sortDir;
+    });
+
+    const th = (label, col, tip) => `<th style="cursor:pointer;user-select:none;white-space:nowrap;" onclick="sortBy('${col}')" title="${tip||''}">${label}${sortArrow(col)}</th>`;
 
     let h = `<div style="overflow-x:auto;margin-top:8px;">
       <table class="prod-table">
-        <thead><tr style="color:#96b7ff;text-align:left;">
-          <th>#</th><th>Sigla</th><th>Nome</th>
-          <th>Chegou</th><th>Último</th>
-          <th title="Tempo ativo total (gap >5min = pausa)">T.Total</th>
-          <th title="Tempo no setor marcação">MARC</th>
-          <th title="Tempo no setor recepção">REC</th>
-          <th title="Marcações no Kliniki">Agend.</th>
-          <th title="Admissões na recepção">Admis.</th>
-          <th title="Conversas WhatsApp">WPP</th>
-          <th title="Setor + estação do último log">Onde</th>
+        <thead><tr>
+          <th>#</th>
+          ${th('Sigla','usuario','')}
+          ${th('Nome','nome','')}
+          ${th('Chegou','chegou','1° login no período')}
+          ${th('Último','ultimo_log','Último log registrado')}
+          ${th('T.Total','min_total','Tempo ativo total (gap >30min = pausa)')}
+          ${th('MARC','min_marcacao','Tempo no setor marcação')}
+          ${th('REC','min_recepcao','Tempo no setor recepção')}
+          ${th('Agend.','_agend','Marcações no Kliniki')}
+          ${th('Admis.','_admis','Admissões na recepção')}
+          ${th('WPP','_wpp','Conversas WhatsApp')}
+          ${th('Onde','ultimo_setor','Setor + estação do último log')}
         </tr></thead><tbody>`;
 
-    users.sort((a,b) => (b.min_total||0) - (a.min_total||0));
     let p = 1;
     for (const u of users) {
-        const mc = (marcMap[u.usuario]||{}).marcacoes || 0;
-        const ad = (recepMap[u.usuario]||{}).admissoes || 0;
-        const wp = (octaMap[u.usuario]||{}).total || 0;
-        const totalEntregas = mc + ad + wp;
+        const totalEntregas = u._agend + u._admis + u._wpp;
         const corpoMole = u.min_total > 60 && totalEntregas === 0;
         const labelSet = u.ultimo_setor === 'marcacao' ? 'MARC' : u.ultimo_setor === 'recepcao' ? 'REC' : (u.ultimo_setor||'').toUpperCase() || '-';
         const cSet = corSetor[u.ultimo_setor] || corSetor.outros;
@@ -364,18 +380,15 @@ function renderAnaliseGeral() {
             <td class="num-cell" style="color:#fff;font-weight:700;">${_fmtHM(u.min_total)}</td>
             <td class="num-cell" style="color:${corSetor.marcacao};">${_fmtHM(u.min_marcacao)}</td>
             <td class="num-cell" style="color:${corSetor.recepcao};">${_fmtHM(u.min_recepcao)}</td>
-            <td class="num-cell" style="color:#f2c94c;font-weight:600;">${mc || '-'}</td>
-            <td class="num-cell" style="color:#66bb6a;font-weight:600;">${ad || '-'}</td>
-            <td class="num-cell">${wp || '-'}</td>
+            <td class="num-cell" style="color:#f2c94c;font-weight:600;">${u._agend || '-'}</td>
+            <td class="num-cell" style="color:#66bb6a;font-weight:600;">${u._admis || '-'}</td>
+            <td class="num-cell">${u._wpp || '-'}</td>
             <td class="num-cell" style="text-align:left;font-size:11px;">
               ${u.ultimo_setor ? `<span style="background:${cSet};color:#0a1230;padding:1px 5px;border-radius:3px;font-weight:700;font-size:10px;">${labelSet}</span> <span style="color:#96b7ff;">${u.ultimo_host || u.ultimo_ip || ''}</span>` : '-'}
             </td>
         </tr>`;
     }
-    h += `</tbody></table></div>
-      <div style="margin-top:12px;padding:8px 12px;font-size:11px;color:#96b7ff;border-left:3px solid #e94560;background:rgba(233,69,96,0.05);">
-        <b style="color:#ffb3c1;">Linhas em vermelho:</b> usuário com mais de 1h de tempo ativo e zero entregas no período (alvo de investigação).
-      </div>`;
+    h += `</tbody></table></div>`;
 
     el.panelAnaliseConteudo.innerHTML = h;
 }
@@ -412,6 +425,7 @@ async function carregarProd() {
         if(prodPeriodo==="hoje"){showSt("Realtime — atualiza a cada 2 min","info");setTimeout(hideSt,4000);}
         // Se tab Comparativos esta visivel, recarrega gráficos com novo periodo
         if (currentTab === "comparativos") carregarComparativos();
+        if (currentTab === "analise") carregarAnaliseGeral();
 
         // Tempo médio WPP: buscar do com_octa=1 em background (não bloqueia)
         const tmUrl = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_octa=1${dateParams}`;
