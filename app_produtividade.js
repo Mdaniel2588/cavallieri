@@ -177,8 +177,13 @@ function _renderCalProd() {
         cell.addEventListener("click", () => {
             const d = Number(cell.dataset.dia), dt = new Date(_pcalAno, _pcalMes, d);
             _pcalQuick = "";
-            if (!_pcalSelA || (_pcalSelA && _pcalSelB)) { _pcalSelA = dt; _pcalSelB = null; _renderCalProd(); }
-            else { _pcalSelB = dt; _pcalExpanded = false; _applyCalProd(); _renderCalProd(); carregarProd(); }
+            // Single click = single day. Re-clicar com A já marcado e B=null amplia pra range.
+            if (_pcalSelA && !_pcalSelB && +_pcalSelA !== +dt) {
+                _pcalSelB = dt; _pcalExpanded = false; _applyCalProd(); _renderCalProd(); carregarProd();
+            } else {
+                _pcalSelA = dt; _pcalSelB = dt; _pcalExpanded = false;
+                _applyCalProd(); _renderCalProd(); carregarProd();
+            }
         });
     });
     box.querySelectorAll(".cal-qbtn").forEach(btn => btn.addEventListener("click", () => _handleProdQuick(btn.dataset.quick)));
