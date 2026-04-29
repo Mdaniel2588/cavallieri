@@ -306,6 +306,9 @@ async function carregarProd() {
         // Se tab Comparativos esta visivel, recarrega gráficos com novo periodo
         if (currentTab === "comparativos") carregarComparativos();
 
+        // Carregar tempo de atividade em background e re-renderizar quando chegar
+        carregarTempoAtividade().then(() => { if (prodData) renderProd(); }).catch(() => {});
+
         // Tempo médio WPP: buscar do com_octa=1 em background (não bloqueia)
         const tmUrl = `${API_PROD}?ano=${ano}&mes=${mes}&periodo=${periodoParam}&com_octa=1${dateParams}`;
         window.apiFetch(tmUrl).then(r=>r.json()).then(j=>{
@@ -327,11 +330,27 @@ async function carregarProd() {
 function showSt(m,t){if(!el.status)return;el.status.hidden=false;el.status.className=`status-banner ${t}`;el.status.textContent=m;}
 function hideSt(){if(el.status)el.status.hidden=true;}
 
+let tempoData = null; // dados do endpoint /tempo_atividade
+const API_TEMPO = API_BASE + "/tempo_atividade";
+
+async function carregarTempoAtividade() {
+    try {
+        const range = _getDateRange();
+        const fim = range.fim || new Date().toISOString().slice(0,10);
+        const fimAjust = new Date(new Date(fim).getTime() + 86400000).toISOString().slice(0,10);
+        const ini = range.ini || fim;
+        const url = `${API_TEMPO}?data_inicio=${ini}&data_fim=${fimAjust}&media=diaria`;
+        const res = await window.apiFetch(url);
+        const json = await res.json();
+        tempoData = json.ok && json.data ? json.data : null;
+    } catch (e) { tempoData = null; }
+}
+
 function renderProd() {
     if (!prodData) return;
     const marc = prodData.marcacao || [], recep = prodData.recepcao || [], octa = prodData.octadesk || [];
     const octaMap = buildOcta(octa);
-    renderTitulo(); renderCards(marc, recep, octa); renderMarcacao(marc, octaMap); renderRecepcao(recep); renderChart(); renderChartWpp(octa);
+    renderTitulo(); renderCards(marc, recep, octa); renderMarcacao(marc, octaMap, recep); renderRecepcao(recep); renderChart(); renderChartWpp(octa);
 }
 
 function renderTitulo() {
@@ -414,11 +433,41 @@ function renderCards(marc, recep, octa) {
         </div>`;
 }
 
-function renderMarcacao(marc, octaMap) {
+function _fmtHM(min) {
+    if (min == null || min < 1) return "-";
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    return h === 0 ? `${m}m` : (m === 0 ? `${h}h` : `${h}h${String(m).padStart(2,'0')}`);
+}
+function _fmtHora(ts) { return ts ? ts.split(' ')[1] || '-' : '-'; }
+
+function renderMarcacao(marc, octaMap, recepArr) {
     if (!el.panelMarc) return;
+    // Mapas auxiliares
+    const recepMap = {};
+    for (const r of (recepArr || [])) recepMap[r.usuario] = r.admissoes || 0;
+    const tempoMap = {};
+    if (tempoData && tempoData.usuarios) for (const t of tempoData.usuarios) tempoMap[t.usuario] = t;
+
     // Separar atendentes normais e agendado direto
-    const lista = marc.filter(u => !isOc(u.usuario) && !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario) && ((u.marcacoes||0)+(u.ligacoes||0)>0))
-        .map(u => { const wpp = (octaMap[u.usuario]||{}).total||0; return {...u, wpp, atendimentos: (u.ligacoes||0)+wpp}; });
+    const lista = marc.filter(u => !isOc(u.usuario) && !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario)
+            && ((u.marcacoes||0)+(u.ligacoes||0)+(recepMap[u.usuario]||0) > 0 || tempoMap[u.usuario]))
+        .map(u => {
+            const wpp = (octaMap[u.usuario]||{}).total||0;
+            const adm = recepMap[u.usuario] || 0;
+            const t = tempoMap[u.usuario] || {};
+            return {...u, wpp, admissoes: adm, atendimentos: (u.ligacoes||0)+wpp,
+                _chegou: t.chegou, _saiu: t.ultimo_log, _setor: t.ultimo_setor, _host: t.ultimo_host,
+                _tTotal: t.min_total||0, _tMarc: t.min_marcacao||0, _tRec: t.min_recepcao||0,
+                _dom: t.dominante};
+        });
+    // Adicionar usuarios com tempo mas sem marcacao/lig/admissao (mostrar mesmo assim — ele esteve la)
+    for (const u of (tempoData?.usuarios||[])) {
+        if (!lista.find(x => x.usuario === u.usuario) && !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario) && !isOc(u.usuario)) {
+            lista.push({usuario: u.usuario, nome: u.nome, marcacoes:0, ligacoes:0, wpp:0, admissoes:0, atendimentos:0,
+                _chegou: u.chegou, _saiu: u.ultimo_log, _setor: u.ultimo_setor, _host: u.ultimo_host,
+                _tTotal: u.min_total||0, _tMarc: u.min_marcacao||0, _tRec: u.min_recepcao||0, _dom: u.dominante});
+        }
+    }
     const diretos = marc.filter(u => AGENDADO_DIRETO.includes(u.usuario) && (u.marcacoes||0)>0);
 
     const efMap = {};
@@ -432,53 +481,74 @@ function renderMarcacao(marc, octaMap) {
 
     let h = `<table class="prod-table"><thead><tr>
         <th>#</th><th>Sigla</th>${th('Nome','nome','')}
-        ${th('Tel','ligacoes','Ligações telefone')}<th>T.Med</th>
-        ${th('WPP','wpp','Conversas WhatsApp')}<th>T.Med</th>
-        ${th('ATEND','atendimentos','Tel+WPP')}
+        ${th('Chegou','_chegou','1° login no dia/periodo')}
+        ${th('Último','_saiu','Último log registrado')}
+        ${th('T.Total','_tTotal','Tempo ativo total (gap >5min = pausa)')}
+        ${th('MARC','_tMarc','Tempo no setor marcação')}
+        ${th('REC','_tRec','Tempo no setor recepção')}
+        ${th('Tel','ligacoes','Ligações telefone atendidas')}
+        ${th('WPP','wpp','Conversas WhatsApp')}
         ${th('Agend.','marcacoes','Agendamentos Kliniki')}
-        ${th('Efic.','_mediaInter','Msgs/chat WPP (menor=mais objetiva)')}${th('Enrol.','_pctLongos','% chats WPP longos (>10 msgs)')}${th('Conv.','_taxaEf','% conversas WPP que viraram marcação')}
+        ${th('Admis.','admissoes','Admissões na recepção')}
+        ${th('Onde','_setor','Local do último log (setor + estação)')}
         <th></th></tr></thead><tbody>`;
 
     let p=1;
+    const corSetor = { marcacao:'#4dd0e1', recepcao:'#66bb6a', adm:'#ffb74d', ti:'#ba68c8', outros:'#78909c' };
     for(const u of lista){
-        const octaInfo = octaMap[u.usuario], tMedWpp = octaInfo?.tempo_medio ? fmt(octaInfo.tempo_medio) : '-';
-        const mi = u._mediaInter || '-', pl = u._pctLongos || 0, te = u._taxaEf || 0;
-        const efC = mi === '-' ? '#555' : mi <= 5 ? '#2ecc71' : mi <= 8 ? '#f39c12' : '#e94560';
-        const enC = pl === 0 ? '#555' : pl <= 20 ? '#2ecc71' : pl <= 30 ? '#f39c12' : '#e94560';
-        const cvC = te === 0 ? '#555' : te >= 20 ? '#2ecc71' : te >= 12 ? '#3498db' : te >= 8 ? '#f39c12' : '#e94560';
-        h+=`<tr><td class="rank-cell">${p++}</td>
-            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td><td style="text-align:left;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'}</td>
-            <td class="num-cell">${u.ligacoes||'-'}</td><td class="num-cell" style="color:#888;">${fmt(u.tempo_medio_lig)}</td>
-            <td class="num-cell">${u.wpp||'-'}</td><td class="num-cell" style="color:#888;">${tMedWpp}</td>
-            <td class="num-cell total-cell">${u.atendimentos||'-'}</td>
+        const cDom = corSetor[u._dom] || corSetor.outros;
+        const cSet = corSetor[u._setor] || corSetor.outros;
+        const labelSet = u._setor === 'marcacao' ? 'MARC' : u._setor === 'recepcao' ? 'REC' : u._setor === 'adm' ? 'ADM' : u._setor === 'ti' ? 'TI' : (u._setor || '-');
+        const totalEntregas = (u.marcacoes||0) + (u.admissoes||0) + (u.atendimentos||0);
+        const sinalCorpoMole = u._tTotal > 60 && totalEntregas === 0;
+        h+=`<tr style="${sinalCorpoMole ? 'background:rgba(233,69,96,0.08);' : ''}"><td class="rank-cell">${p++}</td>
+            <td style="font-weight:bold;color:#4cc9f0;">${u.usuario}</td>
+            <td style="text-align:left;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'}</td>
+            <td class="num-cell" style="color:#c4dbff;">${_fmtHora(u._chegou)}</td>
+            <td class="num-cell" style="color:#c4dbff;">${_fmtHora(u._saiu)}</td>
+            <td class="num-cell" style="color:#fff;font-weight:700;">${_fmtHM(u._tTotal)}</td>
+            <td class="num-cell" style="color:${corSetor.marcacao};">${_fmtHM(u._tMarc)}</td>
+            <td class="num-cell" style="color:${corSetor.recepcao};">${_fmtHM(u._tRec)}</td>
+            <td class="num-cell">${u.ligacoes||'-'}</td>
+            <td class="num-cell">${u.wpp||'-'}</td>
             <td class="num-cell" style="color:#f2c94c;font-weight:600;">${u.marcacoes||0}</td>
-            <td class="num-cell" style="color:${efC};font-weight:700;">${mi !== '-' ? (mi.toFixed?.(1) ?? mi) : '-'}</td>
-            <td class="num-cell" style="color:${enC};font-weight:700;">${pl?pl.toFixed?.(0)+'%':'-'}</td>
-            <td class="num-cell" style="color:${cvC};font-weight:700;">${te?te.toFixed?.(1)+'%':'-'}</td>
+            <td class="num-cell" style="color:#66bb6a;font-weight:600;">${u.admissoes||0}</td>
+            <td class="num-cell" style="text-align:left;font-size:11px;">
+                ${u._setor ? `<span style="background:${cSet};color:#0a1230;padding:1px 5px;border-radius:3px;font-weight:700;font-size:10px;">${labelSet}</span> <span style="color:#96b7ff;">${u._host || u.ultimo_ip || ''}</span>` : '-'}
+            </td>
             <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')" title="Ocultar">×</button></td></tr>`;
     }
 
-    // Agendado Direto (FPK)
+    // Agendado Direto (FPK) — sem dados de tempo, mostra só marcacoes
     if (diretos.length) {
         for (const u of diretos) {
             h+=`<tr style="background:rgba(155,89,182,0.08);"><td></td>
-                <td style="font-weight:bold;color:#9b59b6;">${u.usuario}</td><td style="text-align:left;color:#9b59b6;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'} <span style="font-size:10px;">(Ag.Direto)</span></td>
-                <td colspan="6"></td><td class="num-cell" style="color:#9b59b6;font-weight:600;">${u.marcacoes||0}</td>
-                <td colspan="3"></td><td></td></tr>`;
+                <td style="font-weight:bold;color:#9b59b6;">${u.usuario}</td>
+                <td style="text-align:left;color:#9b59b6;">${u.nome||OCTA_MAP_REV[u.usuario]||'-'} <span style="font-size:10px;">(Ag.Direto)</span></td>
+                <td colspan="7"></td>
+                <td class="num-cell" style="color:#9b59b6;font-weight:600;">${u.marcacoes||0}</td>
+                <td colspan="3"></td></tr>`;
         }
     }
 
-    const tL=lista.reduce((s,u)=>s+(u.ligacoes||0),0), tW=lista.reduce((s,u)=>s+u.wpp,0), tAtend=tL+tW;
+    const tL=lista.reduce((s,u)=>s+(u.ligacoes||0),0), tW=lista.reduce((s,u)=>s+u.wpp,0);
     const tM=lista.reduce((s,u)=>s+(u.marcacoes||0),0) + diretos.reduce((s,u)=>s+(u.marcacoes||0),0);
-    const txConv = tAtend > 0 ? (tM / tAtend * 100).toFixed(1) : '-';
-    const txConvColor = tAtend > 0 ? (parseFloat(txConv) >= 20 ? '#2ecc71' : parseFloat(txConv) >= 12 ? '#3498db' : parseFloat(txConv) >= 8 ? '#f39c12' : '#e94560') : '#666';
-    h+=`<tr class="total-row"><td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td>
-        <td class="num-cell">${tL||'-'}</td><td></td><td class="num-cell">${tW||'-'}</td><td></td>
-        <td class="num-cell total-cell" style="font-size:14px;">${tAtend}</td>
-        <td class="num-cell" style="color:#f2c94c;">${tM}</td>
+    const tA=lista.reduce((s,u)=>s+(u.admissoes||0),0);
+    const tTot=lista.reduce((s,u)=>s+(u._tTotal||0),0);
+    const tMrc=lista.reduce((s,u)=>s+(u._tMarc||0),0);
+    const tRec=lista.reduce((s,u)=>s+(u._tRec||0),0);
+    h+=`<tr class="total-row">
+        <td colspan="3" style="text-align:right;color:#4cc9f0;">TOTAL</td>
         <td colspan="2"></td>
-        <td class="num-cell" style="color:${txConvColor};font-weight:700;font-size:13px;">${txConv}${tAtend>0?'%':''}</td>
-        <td></td></tr></tbody></table>`;
+        <td class="num-cell" style="color:#fff;font-weight:700;">${_fmtHM(tTot)}</td>
+        <td class="num-cell" style="color:#4dd0e1;">${_fmtHM(tMrc)}</td>
+        <td class="num-cell" style="color:#66bb6a;">${_fmtHM(tRec)}</td>
+        <td class="num-cell">${tL||'-'}</td>
+        <td class="num-cell">${tW||'-'}</td>
+        <td class="num-cell" style="color:#f2c94c;">${tM}</td>
+        <td class="num-cell" style="color:#66bb6a;">${tA}</td>
+        <td colspan="2"></td>
+        </tr></tbody></table>`;
 
     // Cards de classificação — canal real + WhatsApp
     const cWpp = _canal.whatsapp||0, cTel = _canal.telefone||0, cHib = _canal.hibrido||0, cDir = _canal.agendado_direto||0, cTotal = cWpp+cTel+cHib+cDir;
