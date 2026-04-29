@@ -348,7 +348,37 @@ function renderAnaliseGeral() {
 
     const th = (label, col, tip) => `<th style="cursor:pointer;user-select:none;white-space:nowrap;" onclick="sortBy('${col}')" title="${tip||''}">${label}${sortArrow(col)}</th>`;
 
-    let h = `<div style="overflow-x:auto;margin-top:8px;">
+    // Card view (mobile)
+    let cards = `<div class="analise-cards">`;
+    let cIdx = 1;
+    for (const u of users) {
+        const totalEntregas = u._agend + u._admis + u._wpp;
+        const corpoMole = u.min_total > 60 && totalEntregas === 0;
+        const labelSet = u.ultimo_setor === 'marcacao' ? 'MARC' : u.ultimo_setor === 'recepcao' ? 'REC' : (u.ultimo_setor||'').toUpperCase() || '-';
+        const cSet = corSetor[u.ultimo_setor] || corSetor.outros;
+        cards += `<div class="analise-card${corpoMole ? ' corpo-mole' : ''}">
+            <div class="analise-card-h">
+                <span class="analise-card-sigla">#${cIdx++} ${u.usuario}</span>
+                <span class="analise-card-nome">${u.nome || OCTA_MAP_REV[u.usuario] || ''}</span>
+                ${u.ultimo_setor ? `<span class="analise-card-where" style="background:${cSet};">${labelSet}</span>` : ''}
+            </div>
+            <div class="analise-card-row">
+                <span>⏱ <b>${_fmtHM(u.min_total)}</b> total</span>
+                <span style="color:${corSetor.marcacao};">MARC <b>${_fmtHM(u.min_marcacao)}</b></span>
+                <span style="color:${corSetor.recepcao};">REC <b>${_fmtHM(u.min_recepcao)}</b></span>
+            </div>
+            <div class="analise-card-row" style="margin-top:4px;">
+                <span>${_fmtHora(u.chegou)} → ${_fmtHora(u.ultimo_log)}</span>
+                ${u._agend ? `<span style="color:#f2c94c;">Agend <b>${u._agend}</b></span>` : ''}
+                ${u._admis ? `<span style="color:#66bb6a;">Admis <b>${u._admis}</b></span>` : ''}
+                ${u._wpp ? `<span>WPP <b>${u._wpp}</b></span>` : ''}
+                <button class="btn-ocultar" style="margin-left:auto;" onclick="toggleOc('${u.usuario}')">×</button>
+            </div>
+        </div>`;
+    }
+    cards += `</div>`;
+
+    let h = cards + `<div class="analise-tabela" style="overflow-x:auto;margin-top:8px;">
       <table class="prod-table">
         <thead><tr>
           <th>#</th>
