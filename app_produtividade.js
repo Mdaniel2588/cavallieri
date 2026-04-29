@@ -472,15 +472,27 @@ function renderTitulo() {
     const titulo = document.getElementById("tituloProd");
     if (!titulo || !prodData) return;
     const range = _getDateRange();
-    let txt = "PRODUTIVIDADE";
-    if (prodPeriodo === "hoje") { const h = new Date(); txt = `PRODUTIVIDADE | HOJE ${String(h.getDate()).padStart(2,'0')}/${String(h.getMonth()+1).padStart(2,'0')}/${h.getFullYear()}`; }
-    else if (_pcalQuick === "semana") txt = `PRODUTIVIDADE | SEMANA CORRENTE`;
-    else if (_pcalQuick === "trimestre") txt = `PRODUTIVIDADE | TRIMESTRE`;
-    else if (_pcalQuick === "semestral") txt = `PRODUTIVIDADE | SEMESTRE`;
-    else if (_pcalQuick === "anual") txt = `PRODUTIVIDADE | ANO ${new Date().getFullYear()}`;
-    else if (prodPeriodo === "mes") { const m = prodData.mes || (new Date().getMonth()+1); txt = `PRODUTIVIDADE | ${_meses[m] || ''} ${prodData.ano || new Date().getFullYear()}`; }
-    else { const ini = range.ini.split('-').reverse().join('/'), fim = range.fim.split('-').reverse().join('/'); txt = ini === fim ? `PRODUTIVIDADE | ${ini}` : `PRODUTIVIDADE | ${ini} a ${fim}`; }
-    titulo.textContent = txt;
+    const ini = (range.ini || '').split('-').reverse().join('/');
+    const fim = (range.fim || '').split('-').reverse().join('/');
+    const dateStr = ini && fim ? (ini === fim ? ini : `${ini} a ${fim}`) : '';
+
+    let label = "";
+    if (prodPeriodo === "hoje") label = "HOJE";
+    else if (_pcalQuick === "semana") label = "SEMANA";
+    else if (_pcalQuick === "trimestre") label = "TRIMESTRE";
+    else if (_pcalQuick === "semestral") label = "SEMESTRE";
+    else if (_pcalQuick === "anual") label = "ANO";
+    else if (prodPeriodo === "mes") {
+        const m = prodData.mes || (new Date().getMonth()+1);
+        const nomeMes = (_meses[m] || '').toUpperCase();
+        const ano = prodData.ano || new Date().getFullYear();
+        titulo.textContent = `PRODUTIVIDADE | ${nomeMes} ${ano}`;
+        return;
+    }
+
+    titulo.textContent = label && dateStr
+        ? `PRODUTIVIDADE | ${label} ${dateStr}`
+        : (label ? `PRODUTIVIDADE | ${label}` : `PRODUTIVIDADE | ${dateStr || ''}`);
 }
 
 function renderCards(marc, recep, octa) {
