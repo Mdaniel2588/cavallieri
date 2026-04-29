@@ -10,7 +10,8 @@ const OCTA_MAP = {
     "Jane Sousa":"JSL","Gessica Oliveira":"GOS","Rose Martins":"RGM",
     "Claudia Barbosa":"DUDU","Diana Anchieta":"DC","Nelia de Abreu Silva":"RAS",
     "Cristialine Silva":"CJS","Renata Aquino":"RAC","Dayane":"DSR",
-    "Karina Cristina Carvalho":"KCC","Rubens Oliver":"RJO"
+    "Karina Cristina Carvalho":"KCC","Rubens Oliver":"RJO",
+    "Jessika Libório Venancio":"JLV"
 };
 
 // Excluir do ranking (sistema/bloqueio)
@@ -64,9 +65,13 @@ function initProdutividade() {
     el.tabMarc = document.getElementById("tabMarcacao");
     el.tabRecep = document.getElementById("tabRecepcao");
     el.tabTimeline = document.getElementById("tabTimeline");
+    el.tabPerfis = document.getElementById("tabPerfis");
     el.panelMarc = document.getElementById("panelMarcacao");
     el.panelRecep = document.getElementById("panelRecepcao");
     el.panelTimeline = document.getElementById("panelTimeline");
+    el.panelPerfis = document.getElementById("panelPerfis");
+    el.panelPerfisConteudo = document.getElementById("panelPerfisConteudo");
+    el.perfisInfo = document.getElementById("perfisInfo");
     el.panelComparativos = document.getElementById("panelComparativos");
     el.tabComparativos = document.getElementById("tabComparativos");
     el.timelineData = document.getElementById("timelineData");
@@ -88,6 +93,7 @@ function initProdutividade() {
     el.tabMarc.addEventListener("click", () => setTab("marc"));
     el.tabRecep.addEventListener("click", () => setTab("recep"));
     el.tabComparativos.addEventListener("click", () => setTab("comparativos"));
+    el.tabPerfis.addEventListener("click", () => setTab("perfis"));
     el.tabTimeline.addEventListener("click", () => setTab("timeline"));
     el.timelineData.value = new Date().toISOString().slice(0,10);
     el.btnTimelineCarregar.addEventListener("click", carregarTimeline);
@@ -264,13 +270,142 @@ function setTab(tab) {
     el.panelRecep.style.display = tab==="recep" ? "" : "none";
     el.panelTimeline.style.display = tab==="timeline" ? "" : "none";
     if (el.panelComparativos) el.panelComparativos.style.display = tab==="comparativos" ? "" : "none";
+    if (el.panelPerfis) el.panelPerfis.style.display = tab==="perfis" ? "" : "none";
     el.tabComparativos.classList.toggle("active", tab==="comparativos");
+    if (el.tabPerfis) el.tabPerfis.classList.toggle("active", tab==="perfis");
     if (tab === "comparativos") carregarComparativos();
+    if (tab === "perfis") carregarPerfis();
     if (tab === "timeline" && !el.timelineConteudo.innerHTML) carregarTimeline();
     if (prodData) renderChart();
 }
 
-function setPeriodo(p) { prodPeriodo = p; if(prodTimer){clearInterval(prodTimer);prodTimer=null;} carregarProd(); if (p === "hoje") prodTimer = setInterval(carregarProd, 120000); }
+function setPeriodo(p) {
+    prodPeriodo = p;
+    if(prodTimer){clearInterval(prodTimer);prodTimer=null;}
+    carregarProd();
+    if (p === "hoje") prodTimer = setInterval(carregarProd, 120000);
+    if (currentTab === "perfis") carregarPerfis();
+}
+
+const API_TEMPO = API_BASE + "/tempo_atividade";
+
+function _getDateRangeForApi() {
+    // mesma lógica do carregarProd: pega range conforme periodo selecionado
+    const ano = el.ano.value, mes = el.mes.value, range = _getDateRange();
+    if (["trimestre","semestral","anual","custom"].includes(prodPeriodo) || (_pcalSelA && _pcalSelB && !_pcalQuick)) {
+        return { ini: range.ini, fim: range.fim };
+    }
+    if (prodPeriodo === "hoje") {
+        const h = new Date().toISOString().slice(0,10);
+        return { ini: h, fim: h };
+    }
+    if (prodPeriodo === "semana") {
+        const h = new Date(); const dow = h.getDay(); const seg = new Date(h);
+        seg.setDate(h.getDate() - (dow === 0 ? 6 : dow - 1));
+        return { ini: seg.toISOString().slice(0,10), fim: h.toISOString().slice(0,10) };
+    }
+    // mes (default)
+    const ini = `${ano}-${String(mes).padStart(2,'0')}-01`;
+    const fimD = new Date(ano, mes, 0); // último dia do mês
+    return { ini, fim: fimD.toISOString().slice(0,10) };
+}
+
+async function carregarPerfis() {
+    if (!el.panelPerfisConteudo) return;
+    el.panelPerfisConteudo.innerHTML = '<div style="color:#96b7ff;padding:20px;text-align:center;">Carregando perfis…</div>';
+    el.perfisInfo.textContent = "";
+    try {
+        const r = _getDateRangeForApi();
+        const fimAjust = new Date(new Date(r.fim).getTime() + 86400000).toISOString().slice(0,10);
+        const url = `${API_TEMPO}?data_inicio=${r.ini}&data_fim=${fimAjust}&media=diaria`;
+        const res = await window.apiFetch(url);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || json.erro || "Erro");
+        renderPerfis(json.data);
+    } catch (e) {
+        el.panelPerfisConteudo.innerHTML = `<div style="color:#ffb3c1;padding:20px;">Falha: ${e.message}</div>`;
+    }
+}
+
+function _fmtHM(min) {
+    if (min == null || min < 1) return "-";
+    const h = Math.floor(min / 60);
+    const m = Math.round(min % 60);
+    if (h === 0) return `${m}m`;
+    return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2,'0')}`;
+}
+
+function renderPerfis(data) {
+    if (!data || !data.usuarios || !data.usuarios.length) {
+        el.panelPerfisConteudo.innerHTML = '<div style="color:#96b7ff;padding:20px;text-align:center;">Sem dados no período.</div>';
+        return;
+    }
+    el.perfisInfo.textContent = `${data.dias_uteis} dias úteis | gap máx ${data.gap_max_seg/60}min`;
+
+    // Filtrar usuarios bloqueados/sistema
+    const users = data.usuarios.filter(u => !EXCLUIR_RANKING.includes(u.usuario));
+
+    const maxTotal = Math.max(...users.map(u => u.min_total));
+    const COR = { marcacao: "#4dd0e1", recepcao: "#66bb6a", adm: "#ffb74d", ti: "#ba68c8", outros: "#78909c" };
+
+    let h = `<div style="overflow-x:auto;margin-top:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="color:#96b7ff;text-align:left;">
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;">Usuario</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;">Nome</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;text-align:right;">Marcação</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;text-align:right;">Recepção</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;text-align:right;">Outros</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;text-align:right;">Total</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;text-align:right;">Média/dia</th>
+            <th style="padding:8px 6px;border-bottom:1px solid #2f4f9c;width:32%;">Distribuição</th>
+          </tr>
+        </thead><tbody>`;
+
+    for (const u of users) {
+        const outros = u.min_outros + u.min_adm + u.min_ti;
+        const total = u.min_total;
+        const pctM = total ? (u.min_marcacao * 100 / total) : 0;
+        const pctR = total ? (u.min_recepcao * 100 / total) : 0;
+        const pctO = total ? (outros * 100 / total) : 0;
+        const dom = u.dominante;
+        const labelDom = dom === 'marcacao' ? 'MARC' : dom === 'recepcao' ? 'RECEP' : dom === 'adm' ? 'ADM' : dom === 'ti' ? 'TI' : '-';
+        const corDom = COR[dom] || COR.outros;
+
+        h += `<tr style="border-bottom:1px solid #1a2a4a;">
+            <td style="padding:6px;color:#fff;font-weight:600;">${u.usuario} <span style="background:${corDom};color:#0a1230;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700;">${labelDom}</span></td>
+            <td style="padding:6px;color:#c4dbff;">${u.nome || '-'}</td>
+            <td style="padding:6px;text-align:right;color:${COR.marcacao};">${_fmtHM(u.min_marcacao)}</td>
+            <td style="padding:6px;text-align:right;color:${COR.recepcao};">${_fmtHM(u.min_recepcao)}</td>
+            <td style="padding:6px;text-align:right;color:${COR.outros};">${_fmtHM(outros)}</td>
+            <td style="padding:6px;text-align:right;color:#fff;font-weight:700;">${_fmtHM(total)}</td>
+            <td style="padding:6px;text-align:right;color:#c4dbff;">${u.horas_total_dia != null ? u.horas_total_dia.toFixed(1)+'h' : '-'}</td>
+            <td style="padding:6px;">
+              <div style="display:flex;height:14px;border-radius:3px;overflow:hidden;background:#0a1230;">
+                ${pctM > 0 ? `<div style="width:${pctM}%;background:${COR.marcacao};" title="Marcação ${pctM.toFixed(0)}%"></div>` : ''}
+                ${pctR > 0 ? `<div style="width:${pctR}%;background:${COR.recepcao};" title="Recepção ${pctR.toFixed(0)}%"></div>` : ''}
+                ${pctO > 0 ? `<div style="width:${pctO}%;background:${COR.outros};" title="Outros ${pctO.toFixed(0)}%"></div>` : ''}
+              </div>
+              <div style="font-size:10px;color:#96b7ff;margin-top:2px;">${pctM.toFixed(0)}% M · ${pctR.toFixed(0)}% R · ${pctO.toFixed(0)}% O</div>
+            </td>
+        </tr>`;
+    }
+    h += `</tbody></table></div>`;
+
+    // Sumario por setor
+    const totMarc = users.reduce((s,u)=>s+u.min_marcacao,0);
+    const totRecep = users.reduce((s,u)=>s+u.min_recepcao,0);
+    const totOutros = users.reduce((s,u)=>s+u.min_outros+u.min_adm+u.min_ti,0);
+    h += `<div style="margin-top:12px;padding:10px;background:#0f1738;border:1px solid #2f4f9c;border-radius:8px;display:flex;gap:18px;flex-wrap:wrap;font-size:12px;">
+      <div><span style="color:${COR.marcacao};">●</span> <b style="color:#fff;">Marcação</b> total ${_fmtHM(totMarc)}</div>
+      <div><span style="color:${COR.recepcao};">●</span> <b style="color:#fff;">Recepção</b> total ${_fmtHM(totRecep)}</div>
+      <div><span style="color:${COR.outros};">●</span> <b style="color:#fff;">Outros</b> total ${_fmtHM(totOutros)}</div>
+      <div style="margin-left:auto;color:#96b7ff;">${users.length} usuários</div>
+    </div>`;
+
+    el.panelPerfisConteudo.innerHTML = h;
+}
 
 async function carregarProd() {
     const ano=el.ano.value, mes=el.mes.value, range = _getDateRange();
