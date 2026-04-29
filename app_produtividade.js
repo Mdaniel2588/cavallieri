@@ -49,7 +49,7 @@ function sortArrow(col) {
 const fmt = s => { if(!s) return '-'; const m=Math.floor(s/60),r=s%60; return m>0?`${m}m${String(r).padStart(2,'0')}s`:`${r}s`; };
 const getOc = () => { try{return JSON.parse(localStorage.getItem(ST_OC))||[];}catch(e){return[];} };
 const isOc = s => getOc().indexOf(s)>=0;
-function toggleOc(s){const a=getOc();const i=a.indexOf(s);if(i>=0)a.splice(i,1);else a.push(s);localStorage.setItem(ST_OC,JSON.stringify(a));renderProd();}
+function toggleOc(s){const a=getOc();const i=a.indexOf(s);if(i>=0)a.splice(i,1);else a.push(s);localStorage.setItem(ST_OC,JSON.stringify(a));renderProd();if(currentTab==="analise")renderAnaliseGeral();}
 function buildOcta(o){const r={};for(const a of(o||[])){const s=OCTA_MAP[a.agente];if(s)r[s]={total:a.total||0,inbound:a.inbound||0,outbound:a.outbound||0,tempo_medio:a.tempo_medio||0};}return r;}
 
 let _pcalMes, _pcalAno, _pcalSelA, _pcalSelB, _pcalExpanded = false, _pcalQuick = "hoje";
@@ -330,7 +330,7 @@ function renderAnaliseGeral() {
 
     // Enriquece cada user com entregas pra usar nos sorts
     const users = (tempoData.usuarios || [])
-        .filter(u => !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario))
+        .filter(u => !EXCLUIR_RANKING.includes(u.usuario) && !AGENDADO_DIRETO.includes(u.usuario) && !isOc(u.usuario))
         .map(u => ({
             ...u,
             _agend: (marcMap[u.usuario]||{}).marcacoes || 0,
@@ -363,6 +363,7 @@ function renderAnaliseGeral() {
           ${th('Admis.','_admis','Admissões na recepção')}
           ${th('WPP','_wpp','Conversas WhatsApp')}
           ${th('Onde','ultimo_setor','Setor + estação do último log')}
+          <th></th>
         </tr></thead><tbody>`;
 
     let p = 1;
@@ -386,9 +387,20 @@ function renderAnaliseGeral() {
             <td class="num-cell" style="text-align:left;font-size:11px;">
               ${u.ultimo_setor ? `<span style="background:${cSet};color:#0a1230;padding:1px 5px;border-radius:3px;font-weight:700;font-size:10px;">${labelSet}</span> <span style="color:#96b7ff;">${u.ultimo_host || u.ultimo_ip || ''}</span>` : '-'}
             </td>
+            <td><button class="btn-ocultar" onclick="toggleOc('${u.usuario}')" title="Excluir da análise">×</button></td>
         </tr>`;
     }
     h += `</tbody></table></div>`;
+
+    // Lista de ocultos com botão restaurar
+    const ocultos = getOc();
+    if (ocultos.length) {
+        const nomes = {};
+        for (const u of (tempoData.usuarios||[])) nomes[u.usuario] = u.nome || OCTA_MAP_REV[u.usuario] || '';
+        h += `<div style="margin-top:10px;padding:8px 12px;background:#0f1738;border:1px solid #2f4f9c;border-radius:6px;font-size:12px;color:#96b7ff;">
+            <b style="color:#c4dbff;">Excluídos da análise:</b> ${ocultos.map(s => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:#1a2a4a;border-radius:3px;cursor:pointer;color:#fff;" onclick="toggleOc('${s}')" title="Restaurar">${s}${nomes[s] ? ' — '+nomes[s] : ''} <span style="color:#66bb6a;">↻</span></span>`).join('')}
+        </div>`;
+    }
 
     el.panelAnaliseConteudo.innerHTML = h;
 }
